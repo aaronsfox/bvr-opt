@@ -1,0 +1,25 @@
+RadFilters_begin
+SobelFilter_begin
+Scale 0.5
+Blend 2.1
+SobelFilter_end
+ContrastFilter_begin
+Alpha 3.9
+Beta 2.7
+ContrastFilter_end
+RadFilters_end
+DrrRenderer_begin
+SampleDistance 0.62
+RayIntensity 0.49
+Cutoff 0
+DrrRenderer_end
+DrrFilters_begin
+SobelFilter_begin
+Scale 0.53
+Blend 2
+SobelFilter_end
+ContrastFilter_begin
+Alpha 0.5
+Beta 1
+ContrastFilter_end
+DrrFilters_end
