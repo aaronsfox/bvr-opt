@@ -15,6 +15,7 @@ import torch.nn.functional as F
 
 from .cameras import MayaCam2
 from .drr import Bone
+from .device import dev
 from .filters import parse_vie
 
 
@@ -70,7 +71,7 @@ class Trial:
         with antialiasing (Williams 2026 used MATLAB imresize, which antialiases by default)."""
         k = (cam, frame, size)
         if k not in self._img:
-            im = torch.from_numpy(self.raw_image(cam, frame))
+            im = dev(torch.from_numpy(self.raw_image(cam, frame)))
             if size:
                 im = F.interpolate(im[None, None], size=(size, size), mode='bicubic', antialias=True,
                                    align_corners=False)[0, 0].clamp(0, 1)

@@ -14,6 +14,8 @@ import tifffile
 import torch
 import torch.nn.functional as F
 
+from .device import dev
+
 
 class Bone:
     def __init__(self, path, voxel, name=None, cutoff_frac=0.0, margin=2):
@@ -26,7 +28,7 @@ class Bone:
         k1, r1, c1 = k.max() + 1 + margin, r.max() + 1 + margin, c.max() + 1 + margin
         crop = v[self.k0:k1, self.r0:r1, self.c0:c1].astype(np.float32) / 65535.0
         self.D, self.H, self.W = crop.shape
-        self.vol = torch.from_numpy(np.ascontiguousarray(crop))[None, None]
+        self.vol = dev(torch.from_numpy(np.ascontiguousarray(crop)))[None, None]
         self.vmax = float(crop.max())
         self.cutoff = cutoff_frac * self.vmax             # Autoscoper: fraction of [min, max] (min = 0)
         # non-zero bounding box in local mm (x = col*sx, y = (H0-row)*sy, z = -slice*sz)
@@ -55,7 +57,7 @@ class Bone:
 
     def surface_points(self, n=2500, quantile=0.6, seed=0):
         """Points on strong 3D intensity gradients (cortical outline), local mm."""
-        v = self.vol[0, 0].numpy()
+        v = self.vol[0, 0].cpu().numpy()
         gz, gy, gx = np.gradient(v, self.sz, self.sy, self.sx); g = np.sqrt(gx ** 2 + gy ** 2 + gz ** 2)
         inside = v > max(self.cutoff, 1e-9)
         k, r, c = np.nonzero(inside & (g > np.quantile(g[inside], quantile)))
@@ -75,8 +77,8 @@ class View:
 
     def roi(self, bone, R, t):
         """Projected bounding box of the bone's non-zero voxels, snapped to the render grid."""
-        P = bone.corners @ np.asarray(R.detach() if torch.is_tensor(R) else R).T + \
-            np.asarray(t.detach() if torch.is_tensor(t) else t)
+        P = bone.corners @ np.asarray(R.detach().cpu() if torch.is_tensor(R) else R).T + \
+            np.asarray(t.detach().cpu() if torch.is_tensor(t) else t)
         uv = self.cam.project(P)
         lo = np.floor(np.clip(uv.min(0), 0, [self.cam.W, self.cam.H]) / self.px) * self.px
         hi = np.ceil(np.clip(uv.max(0), 0, [self.cam.W, self.cam.H]) / self.px) * self.px
@@ -93,7 +95,7 @@ class View:
 
     def _rays(self, lo, hi):
         rr, cc = self.pixel_grid(lo, hi)
-        d = torch.from_numpy(self.cam.ray_dirs_cam(cc.numpy(), rr.numpy())) @ self.Rc   # world dirs
+        d = dev(torch.from_numpy(self.cam.ray_dirs_cam(cc.cpu().numpy(), rr.cpu().numpy()))) @ self.Rc   # world dirs
         return d / d.norm(dim=-1, keepdim=True)
 
     def render(self, bones_poses, lo, hi, rays=None):

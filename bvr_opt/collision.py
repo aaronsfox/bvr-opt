@@ -8,17 +8,19 @@ Penalty for a pair = sum over points of max(0, d_min - d)^2, both directions.
 import numpy as np
 import torch
 import torch.nn.functional as F
+
+from .device import dev
 from scipy import ndimage as ndi
 
 
 class SDF:
     def __init__(self, bone, n_surface=3000, seed=0):
-        v = bone.vol[0, 0].numpy()
+        v = bone.vol[0, 0].cpu().numpy()
         m = ndi.binary_fill_holes(v > 0)
         sp = (bone.sz, bone.sy, bone.sx)
         sdf = ndi.distance_transform_edt(~m, sampling=sp) - ndi.distance_transform_edt(m, sampling=sp)
         self.bone = bone
-        self.grid = torch.from_numpy(sdf.astype(np.float32))[None, None]
+        self.grid = dev(torch.from_numpy(sdf.astype(np.float32)))[None, None]
         surf = m & ~ndi.binary_erosion(m)
         k, r, c = np.nonzero(surf)
         sel = np.random.default_rng(seed).choice(len(k), size=min(n_surface, len(k)), replace=False)

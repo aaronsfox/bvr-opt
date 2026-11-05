@@ -9,6 +9,8 @@ from scipy.interpolate import CubicSpline
 from scipy.signal import butter, filtfilt
 from scipy.spatial.transform import Rotation as Rot, RotationSpline, Slerp
 
+from .device import DEVICE, to_np
+
 
 # ---------------------------------------------------------------- differentiable increments
 def skew(v):
@@ -31,9 +33,9 @@ class Pose:
     new = current * V^-1 * Delta * V  (Tracker::optimize)."""
 
     def __init__(self, R, t, pivot):
-        self.R = torch.as_tensor(np.asarray(R) if not torch.is_tensor(R) else R, dtype=torch.float64)
-        self.t = torch.as_tensor(np.asarray(t) if not torch.is_tensor(t) else t, dtype=torch.float64)
-        self.pivot = torch.as_tensor(np.asarray(pivot), dtype=torch.float64)
+        self.R = torch.as_tensor(np.asarray(R) if not torch.is_tensor(R) else R, dtype=torch.float64, device=DEVICE)
+        self.t = torch.as_tensor(np.asarray(t) if not torch.is_tensor(t) else t, dtype=torch.float64, device=DEVICE)
+        self.pivot = torch.as_tensor(np.asarray(pivot), dtype=torch.float64, device=DEVICE)
 
     @classmethod
     def from_matrix(cls, M, pivot):
@@ -48,16 +50,16 @@ class Pose:
 
     def compose(self, delta):
         with torch.no_grad():
-            R, t = self.apply(torch.as_tensor(np.asarray(delta, float), dtype=torch.float64))
+            R, t = self.apply(torch.as_tensor(np.asarray(delta, float), dtype=torch.float64, device=DEVICE))
         return Pose(R, t, self.pivot)
 
     def matrix(self):
-        M = np.eye(4); M[:3, :3] = self.R.detach().numpy(); M[:3, 3] = self.t.detach().numpy()
+        M = np.eye(4); M[:3, :3] = self.R.detach().cpu().numpy(); M[:3, 3] = self.t.detach().cpu().numpy()
         return M
 
 
 def mat(R, t):
-    M = np.eye(4); M[:3, :3] = np.asarray(R); M[:3, 3] = np.asarray(t); return M
+    M = np.eye(4); M[:3, :3] = to_np(R); M[:3, 3] = to_np(t); return M
 
 
 # ---------------------------------------------------------------- interpolation between keyframes

@@ -3,7 +3,9 @@
 Within a gap between keyframes a and b, each bone's pose is
     pose_n(f) = base_n(f) * Delta_n(f),   Delta_n(f) = sum_k c_nk sin(k pi (f - a) / (b - a)),  k = 1..K
 where base_n is the interpolated keyframe path and Delta a 6-DOF pivot-centred increment (mm, deg) that
-vanishes at both keyframes (hard anchors). The coefficients of all co-fitted bones are fitted jointly to
+vanishes at both keyframes (hard anchors). With a keyframe tolerance, each keyframe also gets its own
+correction, blended linearly across the gaps either side (see AnchoredFit). The coefficients of all
+co-fitted bones are fitted jointly to
 
     L = w_drr * DRR term + w_f2f * frame-to-frame term + lam * sum |c|^2 + mu * contact penalty
 
@@ -21,6 +23,7 @@ import torch.nn.functional as F
 from . import collision
 from .costs import gradcorr, sample_mask
 from .filters import blur
+from .device import to_np
 from .geometry import Pose
 
 
@@ -48,27 +51,73 @@ def drr_term(views, rads, fovs, bones, poses, dil=3):
     return tot, cnt
 
 
-class GapFit:
-    def __init__(self, trial, views, fovs, f2f, sdfs, names, a, b, base, cofit=True, K=3,
-                 w_drr=1.0, w_f2f=2.0, lam=0.003, mu=0.0, d_min=0.0,
+def _capped(u, cap):
+    """Smooth norm cap: |result| < cap, ~u for |u| << 1 (u is in units of cap)."""
+    return cap * u / torch.sqrt(1 + (u * u).sum())
+
+
+class AnchoredFit:
+    """Keyframe-anchored fit over one or more consecutive gaps (keyframes k_0 < k_1 < ... < k_m).
+
+    pose_n(f) = base_n(f) * Delta_n(f), for f in gap (a, b) with s = (f - a) / (b - a):
+        Delta_n(f) = (1 - s) delta_n(a) + s delta_n(b) + sum_k c_nk(gap) sin(k pi s)
+    delta_n(k) is the keyframe tolerance: a 6-DOF correction of keyframe k (shared by the gaps either side).
+    key_tol = None (or 0) -> hard anchors, delta = 0 and keyframes are not fitted; gaps are then independent.
+    key_tol = (mm, deg) -> each keyframe may move within a ball of key_tol[0] mm (translation of the pivot)
+    and key_tol[1] deg (rotation), via a smooth norm cap, plus a quadratic prior key_w * |delta / tol|^2.
+    With tolerance, keyframe frames are also used in the DRR term (their images inform their pose).
+    """
+
+    def __init__(self, trial, views, fovs, f2f, sdfs, names, keys, base, cofit=True, K=3,
+                 w_drr=1.0, w_f2f=2.0, lam=0.003, mu=0.0, d_min=0.0, key_tol=None, key_w=0.01,
                  res=(256, 512), iters=(40, 50), lrs=(0.3, 0.1), batch=4, seed=0, log=print):
-        """views: {res: [View per camera]}; base: {(n, f): 4x4} for f in a..b (a, b = keyframe poses)."""
+        """views: {res: [View per camera]}; base: {(n, f): 4x4} for every f in keys[0]..keys[-1]
+        (keyframe entries are the keyframe poses as given, e.g. by a rater)."""
         self.T, self.views, self.fovs, self.f2f, self.sdfs = trial, views, fovs, f2f, sdfs
-        self.names, self.a, self.b, self.cofit, self.K = list(names), a, b, cofit, K
-        self.w = dict(drr=w_drr, f2f=w_f2f, lam=lam, mu=mu); self.d_min = d_min
+        self.names, self.keys, self.cofit, self.K = list(names), list(keys), cofit, K
+        self.gaps = list(zip(self.keys[:-1], self.keys[1:]))
+        self.w = dict(drr=w_drr, f2f=w_f2f, lam=lam, mu=mu, key=key_w); self.d_min = d_min
+        self.tol = None if not key_tol or max(key_tol) <= 0 else (float(key_tol[0]), float(key_tol[1]))
         self.sched = list(zip(res, iters, lrs)); self.batch = batch
         self.rng = np.random.default_rng(seed); self.log = log
-        self.frames = list(range(a, b + 1)); self.inner = self.frames[1:-1]
-        self.basis = {f: torch.tensor([np.sin(k * np.pi * (f - a) / (b - a)) for k in range(1, K + 1)],
-                                      dtype=torch.float64) for f in self.frames}
+        self.frames = list(range(self.keys[0], self.keys[-1] + 1))
+        self.gap_of = {}
+        for g, (a, b) in enumerate(self.gaps):
+            for f in range(a + 1, b):
+                self.gap_of[f] = g
+        self.inner = [f for f in self.frames if f in self.gap_of]
+        self.fit_frames = self.frames if self.tol else self.inner            # frames whose pose is fitted
         self.base = {(n, f): Pose.from_matrix(base[(n, f)], trial.bones[n].pivot) for n in names for f in self.frames}
-        self.C = {n: torch.zeros(K, 6, dtype=torch.float64, requires_grad=True) for n in names}
+        self.C = {(n, g): torch.zeros(K, 6, dtype=torch.float64, requires_grad=True)
+                  for n in names for g in range(len(self.gaps))}
+        self.U = {(n, k): torch.zeros(2, 3, dtype=torch.float64, requires_grad=True)
+                  for n in names for k in self.keys} if self.tol else {}
         self.pts = {n: torch.tensor(trial.bones[n].surface_points(2500, 0.6, seed=0)) for n in names}
 
+    def params(self):
+        return list(self.C.values()) + list(self.U.values())
+
+    def key_delta(self, n, k):
+        if not self.tol:
+            return None
+        u = self.U[(n, k)]
+        return torch.cat([_capped(u[0], self.tol[0]), _capped(u[1], self.tol[1])])
+
+    def delta(self, n, f):
+        if f in self.gap_of:
+            g = self.gap_of[f]; a, b = self.gaps[g]; s = (f - a) / (b - a)
+            basis = torch.tensor([np.sin(k * np.pi * s) for k in range(1, self.K + 1)], dtype=torch.float64)
+            d = basis @ self.C[(n, g)]
+            if self.tol:
+                d = d + (1 - s) * self.key_delta(n, a) + s * self.key_delta(n, b)
+            return d
+        return self.key_delta(n, f)                                        # keyframe (None: hard anchor)
+
     def pose(self, n, f):
-        if f in (self.a, self.b):
+        d = self.delta(n, f)
+        if d is None:
             return self.base[(n, f)].R, self.base[(n, f)].t
-        return self.base[(n, f)].apply(self.basis[f] @ self.C[n])
+        return self.base[(n, f)].apply(d)
 
     def drr_frame(self, res, f):
         """Mean DRR term over the (bone, camera) pairs of frame f."""
@@ -93,49 +142,78 @@ class GapFit:
         return tot / max(cnt, 1)
 
     def contact_term(self):
+        fs = self.fit_frames
         return sum(collision.penalty(self.sdfs, {n: self.pose(n, f) for n in self.names}, self.d_min)
-                   for f in self.inner) / len(self.inner)
+                   for f in fs) / len(fs)
+
+    def prior(self):
+        L = self.w['lam'] * sum((c ** 2).sum() for c in self.C.values())
+        if self.tol:
+            L = L + self.w['key'] * sum(((self.key_delta(n, k)[:3] / self.tol[0]) ** 2).sum() +
+                                        ((self.key_delta(n, k)[3:] / self.tol[1]) ** 2).sum()
+                                        for n, k in self.U)
+        return L
+
+    def sample_frames(self):
+        """`batch` frames per gap (inner frames; with tolerance, the gap's end keyframes as well)."""
+        fs = set()
+        for a, b in self.gaps:
+            pool = list(range(a, b + 1)) if self.tol else list(range(a + 1, b))
+            fs.update(int(x) for x in self.rng.choice(pool, size=min(self.batch, len(pool)), replace=False))
+        return sorted(fs)
 
     def step(self, res, fs):
-        """Accumulate gradients of the full objective term by term (one frame's render graph at a time,
-        to bound memory). Returns the loss value and its terms."""
+        """Accumulate gradients of the objective term by term (one frame's render graph at a time, to bound
+        memory). DRR term: mean over the sampled frames, scaled by the number of gaps so that each gap's
+        coefficients see the same gradient scale as a single-gap fit. Returns the loss value and its terms."""
         terms = {}
-        L = self.w['lam'] * sum((c ** 2).sum() for c in self.C.values()); L.backward(); total = float(L.detach())
+        L = self.prior(); L.backward(); total = float(L.detach())
+        ng = len(self.gaps)
         if self.w['drr'] > 0:
             d = 0.0
             for f in fs:
-                t_ = self.w['drr'] * self.drr_frame(res, f) / len(fs)
+                t_ = self.w['drr'] * ng * self.drr_frame(res, f) / len(fs)
                 if torch.is_tensor(t_):
                     t_.backward(); d += float(t_)
-            terms['drr'] = d / self.w['drr']; total += d
+            terms['drr'] = d / self.w['drr'] / ng; total += d
         if self.w['f2f'] > 0:
-            t_ = self.f2f_term(); (self.w['f2f'] * t_).backward()
-            terms['f2f'] = float(t_); total += self.w['f2f'] * float(t_)
+            t_ = self.f2f_term(); (self.w['f2f'] * ng * t_).backward()
+            terms['f2f'] = float(t_); total += self.w['f2f'] * ng * float(t_)
         if self.w['mu'] > 0 and len(self.names) > 1:
-            t_ = self.contact_term(); (self.w['mu'] * t_).backward()
-            terms['contact'] = float(t_); total += self.w['mu'] * float(t_)
+            t_ = self.contact_term(); (self.w['mu'] * ng * t_).backward()
+            terms['contact'] = float(t_); total += self.w['mu'] * ng * float(t_)
         return total, terms
 
     def run(self):
         t0 = time.time(); hist = []
+        tag = f'keys {self.keys[0]}-{self.keys[-1]} ({len(self.gaps)} gaps) {"+".join(self.names)}'
         for res, it, lr in self.sched:
-            opt = torch.optim.Adam(list(self.C.values()), lr=lr)
+            opt = torch.optim.Adam(self.params(), lr=lr)
             sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, it)
             for k in range(it):
-                fs = self.rng.choice(self.inner, size=min(self.batch, len(self.inner)), replace=False)
+                fs = self.sample_frames()
                 opt.zero_grad()
                 L, terms = self.step(res, fs)
                 opt.step(); sch.step()
                 hist.append({'res': res, 'L': L, **terms})
-            self.log(f'    gap {self.a}-{self.b} {"+".join(self.names)}: res {res} done, loss {L:.4f}, '
-                     f'{time.time() - t0:.0f}s')
+            self.log(f'    {tag}: res {res} done, loss {L:.4f}, {time.time() - t0:.0f}s')
         track = {}
         with torch.no_grad():
             for n in self.names:
-                for f in self.inner:
+                for f in self.fit_frames:
                     R, t = self.pose(n, f)
-                    M = np.eye(4); M[:3, :3] = R.numpy(); M[:3, 3] = t.numpy(); track[(n, f)] = M
-        return track, dict(sec=time.time() - t0, hist=hist, coef={n: c.detach().numpy().tolist() for n, c in self.C.items()})
+                    M = np.eye(4); M[:3, :3] = to_np(R); M[:3, 3] = to_np(t); track[(n, f)] = M
+        info = dict(sec=time.time() - t0, hist=hist,
+                    coef={f'{n}_{g}': to_np(c).tolist() for (n, g), c in self.C.items()})
+        if self.tol:
+            with torch.no_grad():
+                info['key_delta'] = {f'{n}_{k}': to_np(self.key_delta(n, k)).tolist() for n, k in self.U}
+        return track, info
+
+
+def GapFit(trial, views, fovs, f2f, sdfs, names, a, b, base, **kw):
+    """Single gap with hard anchors (pilot interface)."""
+    return AnchoredFit(trial, views, fovs, f2f, sdfs, names, [a, b], base, **kw)
 
 
 def per_frame_fit(trial, views, fovs, sdfs, names, f, base, cofit=True, mu=0.0, d_min=0.0,
@@ -163,5 +241,5 @@ def per_frame_fit(trial, views, fovs, sdfs, names, f, base, cofit=True, mu=0.0, 
     out = {}
     with torch.no_grad():
         for n in names:
-            R, t = P0[n].apply(X[n]); M = np.eye(4); M[:3, :3] = R.numpy(); M[:3, 3] = t.numpy(); out[(n, f)] = M
+            R, t = P0[n].apply(X[n]); M = np.eye(4); M[:3, :3] = to_np(R); M[:3, 3] = to_np(t); out[(n, f)] = M
     return out, time.time() - t0

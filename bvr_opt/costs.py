@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 from scipy.ndimage import binary_erosion, binary_fill_holes, gaussian_filter, sobel as nd_sobel
 
+from .device import dev
 from .filters import apply_chain, blur, sobel_xy
 
 
@@ -32,7 +33,7 @@ def fov_masks(trial, thresh=0.02, erode=15):
         for f in range(trial.n_frames):
             np.maximum(mx, trial.raw_image(ci, f), out=mx)
         m = binary_erosion(binary_fill_holes(mx > thresh), iterations=erode)
-        out.append(torch.from_numpy(m.astype(np.float32)))
+        out.append(dev(torch.from_numpy(m.astype(np.float32))))
     return out
 
 
@@ -102,7 +103,7 @@ class F2F:
             for ci in range(len(trial.cams)):
                 c0, r0, c1, r1 = self.crop[ci]
                 im = gaussian_filter(1 - trial.raw_image(ci, f), sigma)[r0:r1, c0:c1]
-                self.G[(f, ci)] = torch.from_numpy(np.stack([nd_sobel(im, axis=1), -nd_sobel(im, axis=0)]))[None].float()
+                self.G[(f, ci)] = dev(torch.from_numpy(np.stack([nd_sobel(im, axis=1), -nd_sobel(im, axis=0)]).astype(np.float32)))[None]
 
     def project(self, ci, P):
         Rc, tc, c = self.cams[ci]

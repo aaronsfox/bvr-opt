@@ -1,1 +1,4 @@
 __pycache__/
+results/analysis1/
+a1-smoke-*.out
+a1-score-*.out
