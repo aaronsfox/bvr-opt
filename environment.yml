@@ -1,0 +1,24 @@
+# Conda environment for bvr-opt
+#
+# Create:   conda env create -f environment.yml
+# Update:   conda env update -f environment.yml --prune
+# Activate: conda activate bvr_opt
+#
+# Conda installs only Python and pip; everything else is installed by pip from
+# requirements.txt. This keeps conda's dependency solving trivial, so it works
+# quickly even with old conda versions (e.g. 4.9.2) that lack the fast solver.
+# Run it on a compute node, not the login node.
+#
+# PyTorch is the CPU-only build (see requirements.txt). For a GPU environment,
+# install the CUDA build matching the cluster's driver after creating it, e.g.
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+
+name: bvr_opt
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -r requirements.txt

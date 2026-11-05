@@ -1,9 +1,7 @@
 # Python packages for bvr-opt (Python 3.12)
 #
-# Set up a virtual environment named bvr_opt:
-#   python3.12 -m venv ~/venvs/bvr_opt
-#   source ~/venvs/bvr_opt/bin/activate
-#   pip install --upgrade pip
+# Installed automatically by environment.yml (conda env create -f environment.yml).
+# Can also be used on its own in any Python 3.12 environment:
 #   pip install -r requirements.txt
 #
 # PyTorch comes from the CPU-only wheel index below (smaller, and what the CPU
