@@ -6,8 +6,8 @@ Do not crop volumes: Autoscoper places the volume frame at the volume's corner, 
 shift the frame and break the reference poses.
 
 Usage:
-    python scripts/compress_volumes.py datasets/Welte2022/data/SOL001A/Models/PV
-    python scripts/compress_volumes.py path/to/one_volume.tif
+    python utilities/compress_volumes.py datasets/Welte2022/data/SOL001A/Models/PV
+    python utilities/compress_volumes.py path/to/one_volume.tif
 """
 import argparse
 import os

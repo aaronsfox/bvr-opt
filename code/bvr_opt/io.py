@@ -1,6 +1,6 @@
 """Loading a Welte-style Autoscoper trial folder.
 
-Layout (see scripts/organise_welte2022.py):
+Layout (see utilities/organise_welte2022.py):
     <trial>/<trial>.cfg, Calibration/*.txt (MayaCam 2.0), Models/PV/*.tif, RadiographImages/cam1|cam2,
     Reference/<trial>_{cal,tal,tib}.tra, xParameters/control_settings.vie
 """

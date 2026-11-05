@@ -1,15 +1,15 @@
 """Methods comparison runner (Analysis 1 in the plan doc): splits every arm into independent units of work and runs them.
 
-    python methods_comparison/run.py list   [--arm A,B,C]            # print the units (one per line)
-    python methods_comparison/run.py run    --arm B [--task 0 --ntasks 1] [--max-units N] [--quick]
+    python methods_comparison/run.py list   [--arm keyframe_interp,pso_simplex,new_opt]            # print the units (one per line)
+    python methods_comparison/run.py run    --arm pso_simplex [--task 0 --ntasks 1] [--max-units N] [--quick]
     python methods_comparison/run.py assemble                        # units -> one track per (arm, trial, offset)
 
 A unit is the smallest independent piece of an arm:
-    A, A_linear                (trial, offset)               interpolation through the keyframes
-    B, B_512                   (trial, offset, bone, gap)    forward pass from one keyframe to the next
-    B_akhbari                  (trial, offset, bone)         one forward pass from the first keyframe
-    C, C_drr, C_f2f, ...       (trial, offset, gap)          anchored fit of one gap, bones co-fitted
-    C_perframe                 (trial, offset, gap)          each frame of the gap fitted on its own
+    keyframe_interp(_linear)              (trial, offset)               interpolation through the keyframes
+    pso_simplex, pso_simplex_512          (trial, offset, bone, gap)    forward pass from one keyframe to the next
+    pso_simplex_single_pass               (trial, offset, bone)         one forward pass from the first keyframe
+    new_opt, new_opt_drr_only, ...        (trial, offset, gap)          anchored fit of one gap, bones co-fitted
+    new_opt_per_frame                     (trial, offset, gap)          each frame of the gap fitted on its own
 
 `run` processes units[task::ntasks] and skips units whose output exists, so jobs can be resubmitted.
 Outputs go to $BVR_RESULTS (default <repo>/results/methods_comparison), one folder per arm:
@@ -28,7 +28,7 @@ import numpy as np
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, 'code'))           # the bvr_opt package lives in code/bvr_opt
 import torch  # noqa: E402
 
 from bvr_opt import collision  # noqa: E402
@@ -284,7 +284,7 @@ def main():
     ap.add_argument('--ntasks', type=int, default=1)
     ap.add_argument('--max-units', type=int, default=0)
     ap.add_argument('--quick', action='store_true',
-                    help='smoke test: B tracks 2 frames with 3 PSO epochs, C/perframe run 2 iterations per stage; nothing is saved')
+                    help='smoke test: pso_simplex arms track 2 frames with 3 PSO epochs, new_opt arms run 2 iterations per stage; nothing is saved')
     args = ap.parse_args()
     torch.set_num_threads(int(os.environ.get('THREADS', os.environ.get('SLURM_CPUS_PER_TASK', '2'))))
     if args.cmd == 'list':

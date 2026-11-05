@@ -17,16 +17,17 @@ butterworth: {fs: 250.0, fc: 10.0, order: 2}
 
 arms:
   # ---------------------------------------------------------------- main
-  A:            {kind: interp, interp: spline}
-  B:            {kind: autoscoper, render: full, image: full, guess: previous, restart: keyframe}
-  C:            {kind: anchored, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
-                 K: 3, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1], batch: 4, key_tol: null}
+  # Arm names: keyframe_interp (A in the plan), pso_simplex (B), new_opt (C)
+  keyframe_interp:            {kind: interp, interp: spline}
+  pso_simplex:                {kind: autoscoper, render: full, image: full, guess: previous, restart: keyframe}
+  new_opt:                    {kind: anchored, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
+                               K: 3, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1], batch: 4, key_tol: null}
   # ---------------------------------------------------------------- supplementary
-  A_linear:     {kind: interp, interp: linear}
-  B_512:        {kind: autoscoper, render: 512, image: 512, guess: previous, restart: keyframe}
-  B_akhbari:    {kind: autoscoper, render: full, image: full, guess: previous, restart: first, offsets: [0]}
-  C_alone:      {base: C, cofit: false}
-  C_drr:        {base: C, w_f2f: 0.0}
-  C_f2f:        {base: C, w_drr: 0.0}
-  C_nocontact:  {base: C, mu: 0.0}
-  C_perframe:   {kind: perframe, cofit: true, mu: 0.01, d_min: -2.0, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1]}
+  keyframe_interp_linear:     {kind: interp, interp: linear}
+  pso_simplex_512:            {kind: autoscoper, render: 512, image: 512, guess: previous, restart: keyframe}
+  pso_simplex_single_pass:    {kind: autoscoper, render: full, image: full, guess: previous, restart: first, offsets: [0]}
+  new_opt_single_bone:        {base: new_opt, cofit: false}
+  new_opt_drr_only:           {base: new_opt, w_f2f: 0.0}
+  new_opt_f2f_only:           {base: new_opt, w_drr: 0.0}
+  new_opt_no_collision:       {base: new_opt, mu: 0.0}
+  new_opt_per_frame:          {kind: perframe, cofit: true, mu: 0.01, d_min: -2.0, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1]}

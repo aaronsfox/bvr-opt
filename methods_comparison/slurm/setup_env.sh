@@ -1,7 +1,7 @@
 #!/bin/bash
 # Create the conda environment `bvr_opt_gpu` used by the SLURM scripts (run once; it needs internet access).
 # Following environment.yml, run it on a compute node:
-#   srun -p normal -c 4 --mem=16G -t 01:00:00 bash methods_comparison/slurm/setup_env.sh
+#   sbatch methods_comparison/slurm/setup_env.sbatch       (batch job; or `bash` this script on a node)
 # (if compute nodes have no internet, run `bash methods_comparison/slurm/setup_env.sh` on the login node instead).
 # The CUDA build of PyTorch also runs on CPU-only nodes, so the same environment serves both partitions.
 # PyTorch comes from the CUDA 12.6 wheel index, which runs on NVIDIA drivers >= 525 (CUDA 12.x minor-version

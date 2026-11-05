@@ -23,8 +23,8 @@ Calibration and models are shared by all trials, so each trial receives its own 
 shared folders are then removed. Trial folders are any folder starting with "T".
 
 Usage:
-    python scripts/organise_welte2022.py datasets/Welte2022/data/SOL001A
-    python scripts/organise_welte2022.py datasets/Welte2022/data/SOL001A --dry-run
+    python utilities/organise_welte2022.py datasets/Welte2022/data/SOL001A
+    python utilities/organise_welte2022.py datasets/Welte2022/data/SOL001A --dry-run
 """
 import argparse
 import re

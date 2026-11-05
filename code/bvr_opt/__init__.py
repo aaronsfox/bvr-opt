@@ -1,4 +1,4 @@
-"""bvr_opt: keyframe-anchored biplanar videoradiography (BVR) bone tracking.
+"""bvr_opt (in code/bvr_opt): keyframe-anchored biplanar videoradiography (BVR) bone tracking.
 
 Modules
 -------

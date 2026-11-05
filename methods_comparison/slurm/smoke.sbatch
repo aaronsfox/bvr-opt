@@ -6,7 +6,7 @@
 #SBATCH --mem=32G
 #SBATCH --time=01:00:00
 #SBATCH --output=mc-smoke-%j.out
-# Checks the GPU environment and times each arm. Submit from the repo root:
+# Checks the GPU environment and times the expensive arms. Submit from the repo root:
 #   sbatch methods_comparison/slurm/smoke.sbatch
 # Nothing is written to the results folder; read the timings at the end of mc-smoke-<jobid>.out.
 set -eo pipefail   # no -u: conda activate scripts use unset variables
@@ -15,6 +15,6 @@ nvidia-smi
 python -c "import torch; print('torch', torch.__version__, 'CUDA', torch.version.cuda, 'available', torch.cuda.is_available(), torch.cuda.get_device_name() if torch.cuda.is_available() else '')"
 python methods_comparison/bench.py
 export THREADS=$SLURM_CPUS_PER_TASK
-python methods_comparison/run.py run --arm B --quick --max-units 1
-python methods_comparison/run.py run --arm C --quick --max-units 1
-python methods_comparison/run.py run --arm C_perframe --quick --max-units 1
+python methods_comparison/run.py run --arm pso_simplex --quick --max-units 1
+python methods_comparison/run.py run --arm new_opt --quick --max-units 1
+python methods_comparison/run.py run --arm new_opt_per_frame --quick --max-units 1

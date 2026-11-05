@@ -2,8 +2,8 @@
 
     python methods_comparison/bench.py
 
-Prints the time of one Autoscoper-replica cost evaluation (arm B: about 4,700 per bone-frame in the pilot)
-at full and 512 resolution, and of one co-fitted anchored-fit iteration (arm C: 90 per gap), and an
+Prints the time of one Autoscoper-replica cost evaluation (pso_simplex: about 4,700 per bone-frame in the pilot)
+at full and 512 resolution, and of one co-fitted anchored-fit iteration (new_opt: 90 per gap), and an
 estimate of the GPU-hours per arm.
 """
 import os
@@ -47,7 +47,7 @@ def main():
                 s = timeit(lambda: float(autoscoper_cost(views, rads, T.bones[n], P, x, T.vie)), 10)
             per_eval.setdefault(render, []).append(s)
             print(f'Autoscoper cost, render {render}, {n}: {1000 * s:.1f} ms per evaluation')
-    c = arm_cfg('C'); keys = keyframes(T.n_frames, 0)
+    c = arm_cfg('new_opt'); keys = keyframes(T.n_frames, 0)
     fovs, views, sdfs = setup_anchored(T)
     base = spline_track(T, ref_keys(T, keys, CFG['bones'])); a, b = 20, 30; frames = list(range(a, b + 1))
     fit = AnchoredFit(T, views, fovs, f2f_for(T, fovs, base, frames), sdfs, CFG['bones'], [a, b],
@@ -61,11 +61,11 @@ def main():
         it[res] = timeit(one, 3)
         print(f'Anchored fit (co-fitted, contact on), res {res}: {it[res]:.2f} s per iteration')
     evals = 4700
-    nB = sum(1 for u in units('B') for _ in range(u['b'] - u['a'] - 1)) * 1.0
+    nB = sum(1 for u in units('pso_simplex') for _ in range(u['b'] - u['a'] - 1)) * 1.0
     gB = nB * evals * np.mean(per_eval[T.render_resolution[0]]) / 3600
-    nC = len(units('C')); gC = nC * (40 * it[256] + 50 * it[512]) / 3600
-    print(f'\nEstimate, one process per GPU: arm B {nB:.0f} bone-frames x {evals} evaluations = {gB:.0f} GPU-hours; '
-          f'arm C {nC} gaps = {gC:.1f} GPU-hours. Several processes per GPU (WORKERS) overlap these.')
+    nC = len(units('new_opt')); gC = nC * (40 * it[256] + 50 * it[512]) / 3600
+    print(f'\nEstimate, one process per GPU: pso_simplex {nB:.0f} bone-frames x {evals} evaluations = {gB:.0f} GPU-hours; '
+          f'new_opt {nC} gaps = {gC:.1f} GPU-hours. Several processes per GPU (WORKERS) overlap these.')
 
 
 if __name__ == '__main__':
