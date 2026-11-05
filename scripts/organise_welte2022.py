@@ -15,7 +15,7 @@ New layout:
             Models/IV/*.iv
             Models/PV/*.tif
             RadiographImages/cam1, RadiographImages/cam2
-            xParameters/*.vie
+            xParameters/control_settings.vie   (the name Autoscoper loads automatically)
             Reference/*.tra
             <trial>.cfg          (Autoscoper config v1.1, paths relative to the trial folder)
 
@@ -94,9 +94,12 @@ def organise(root: Path, dry_run: bool = False) -> None:
             cfgs = sorted(auto.glob("*.cfg"))
             if len(cfgs) != 1:
                 sys.exit(f"Expected one .cfg in {auto}, found {len(cfgs)}")
-            do(f"move {len(vies)} .vie -> xParameters/",
-               lambda: [(trial / "xParameters").mkdir(exist_ok=True)] +
-                       [shutil.move(v, trial / "xParameters" / v.name) for v in vies])
+            if len(vies) != 1:
+                sys.exit(f"Expected one .vie in {auto}, found {len(vies)}")
+            # Autoscoper only auto-loads <cfg folder>/xParameters/control_settings.vie
+            do(f"move {vies[0].name} -> xParameters/control_settings.vie",
+               lambda: ((trial / "xParameters").mkdir(exist_ok=True),
+                        shutil.move(vies[0], trial / "xParameters" / "control_settings.vie")))
             new_cfg = trial / f"{trial.name}.cfg"
             text = rewrite_cfg(cfgs[0].read_text())
             do(f"write {new_cfg.name} (relative paths) from {cfgs[0].name}", new_cfg.write_text, text)
