@@ -28,17 +28,17 @@ import numpy as np
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'code'))           # the bvr_opt package lives in code/bvr_opt
+sys.path.insert(0, ROOT)                                 # source code is the package src/
 import torch  # noqa: E402
 
-from bvr_opt import collision  # noqa: E402
-from bvr_opt.costs import F2F, autoscoper_cost, fov_masks  # noqa: E402
-from bvr_opt.device import DEVICE  # noqa: E402
-from bvr_opt.drr import View  # noqa: E402
-from bvr_opt.geometry import Pose, interpolate  # noqa: E402
-from bvr_opt.io import Trial  # noqa: E402
-from bvr_opt.optim import autoscoper_optimize  # noqa: E402
-from bvr_opt.tracking import AnchoredFit, per_frame_fit  # noqa: E402
+from src import collision  # noqa: E402
+from src.costs import F2F, autoscoper_cost, fov_masks  # noqa: E402
+from src.device import DEVICE  # noqa: E402
+from src.drr import View  # noqa: E402
+from src.geometry import Pose, interpolate  # noqa: E402
+from src.io import Trial  # noqa: E402
+from src.optim import autoscoper_optimize  # noqa: E402
+from src.tracking import AnchoredFit, per_frame_fit  # noqa: E402
 
 CFG = yaml.safe_load(open(os.path.join(ROOT, 'methods_comparison', 'config.yaml')))
 QUICK = {}   # smoke-test overrides set from the command line (never used for real runs)

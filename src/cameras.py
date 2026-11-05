@@ -5,7 +5,7 @@ MayaCam 2.0 files (written by XMALab) hold an OpenCV pinhole camera:
 with (col, row) in pixels, origin at the top-left pixel *centre* of the image. Autoscoper's
 loader (Camera::loadMayaCam2) converts these to its own bottom-up frame; the geometry is the same.
 
-Throughout bvr_opt, image coordinates are *continuous* pixel coordinates with pixel i spanning
+Throughout src, image coordinates are *continuous* pixel coordinates with pixel i spanning
 [i, i+1] (centre i + 0.5), matching torch.grid_sample(align_corners=False). Hence the +0.5 below.
 """
 import numpy as np

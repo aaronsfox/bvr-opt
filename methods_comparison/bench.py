@@ -15,11 +15,11 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run import CFG, arm_cfg, f2f_for, keyframes, ref_keys, setup_anchored, spline_track, trial, units  # noqa: E402
-from bvr_opt.costs import autoscoper_cost  # noqa: E402
-from bvr_opt.device import DEVICE  # noqa: E402
-from bvr_opt.drr import View  # noqa: E402
-from bvr_opt.geometry import Pose  # noqa: E402
-from bvr_opt.tracking import AnchoredFit  # noqa: E402
+from src.costs import autoscoper_cost  # noqa: E402
+from src.device import DEVICE  # noqa: E402
+from src.drr import View  # noqa: E402
+from src.geometry import Pose  # noqa: E402
+from src.tracking import AnchoredFit  # noqa: E402
 
 
 def sync():

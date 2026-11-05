@@ -24,8 +24,8 @@ import torch  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run import CFG, RESULTS, keyframes, trial  # noqa: E402
-from bvr_opt import collision  # noqa: E402
-from bvr_opt.geometry import butterworth, helical_error, pivot_error  # noqa: E402
+from src import collision  # noqa: E402
+from src.geometry import butterworth, helical_error, pivot_error  # noqa: E402
 
 BONES = CFG['bones']; JOINTS = [('tib', 'tal'), ('tal', 'cal')]
 NAME = {'tib': 'Tibia', 'tal': 'Talus', 'cal': 'Calcaneus', 'tib-tal': 'Tibia–talus', 'tal-cal': 'Talus–calcaneus'}

@@ -15,8 +15,8 @@ Frames between the first and last keyframe are scored against the reference; key
 | new_opt_single_bone, new_opt_drr_only, new_opt_f2f_only, new_opt_no_collision | Supplementary ablations of new_opt: bones fitted alone; DRR term only; frame-to-frame only; no collision | 74 each |
 | new_opt_per_frame | Supplementary ablation: no anchoring, each frame fitted on its own | 74 |
 
-Settings live in `config.yaml`; `python methods_comparison/run.py list` prints every unit. The package
-used by the pipeline is `code/bvr_opt`.
+Settings live in `config.yaml`; `python methods_comparison/run.py list` prints every unit. The source
+code used by the pipeline is the package in `src/`.
 
 ## Running on the HPC (SLURM)
 
