@@ -1,8 +1,8 @@
-# Analysis 1: method comparison with perfect keyframes
+# Methods comparison with perfect keyframes
 
 All four SOL001A trials, tibia, talus and calcaneus. Keyframes are the bead-based reference poses every
 10 frames, at four offsets (first keyframe at frame 0, 3, 5, 8). Frames between the first and last
-keyframe are scored against the reference; keyframes are excluded. Design: plan doc, Study design.
+keyframe are scored against the reference; keyframes are excluded. Design: plan doc, Study design (Analysis 1).
 
 | Arm | What it is | Units (one SLURM work item each) |
 |---|---|---|
@@ -15,7 +15,7 @@ keyframe are scored against the reference; keyframes are excluded. Design: plan 
 | C_alone, C_drr, C_f2f, C_nocontact | Supplementary ablations of C: bones alone; DRR term only; frame-to-frame only; no collision | 74 each |
 | C_perframe | Supplementary ablation: no anchoring, each frame fitted on its own | 74 |
 
-Settings live in `config.yaml`; `python analysis1/run.py list` prints every unit.
+Settings live in `config.yaml`; `python methods_comparison/run.py list` prints every unit.
 
 ## Running on the HPC (SLURM, `dgx` partition)
 
@@ -23,32 +23,41 @@ From the repo root on the login node:
 
 ```bash
 # 1. once: GPU conda environment (needs internet, so run it on the login node)
-bash analysis1/slurm/setup_env.sh
+bash methods_comparison/slurm/setup_env.sh
 
-# 2. smoke test: checks the GPU, times arms B and C (nothing is saved). Read the end of a1-smoke-<jobid>.out
-sbatch analysis1/slurm/smoke.sbatch
+# 2. smoke test: checks the GPU, times arms B and C (nothing is saved). Read the end of mc-smoke-<jobid>.out
+sbatch methods_comparison/slurm/smoke.sbatch
 
 # 3. submit the arms as job arrays: ARM NJOBS [WORKERS_PER_GPU] [TIME]
-bash analysis1/slurm/submit.sh C 8 4 12:00:00
-bash analysis1/slurm/submit.sh B 24 4 48:00:00
-bash analysis1/slurm/submit.sh C_alone,C_drr,C_f2f,C_nocontact,C_perframe 8 4 24:00:00
+bash methods_comparison/slurm/submit.sh C 8 4 12:00:00
+bash methods_comparison/slurm/submit.sh B 24 4 48:00:00
+bash methods_comparison/slurm/submit.sh C_alone,C_drr,C_f2f,C_nocontact,C_perframe 8 4 24:00:00
 
 # 4. progress: units finished per arm
-for a in A B C; do echo $a $(ls results/analysis1/units/$a 2>/dev/null | wc -l); done
+for a in A B C; do echo $a $(ls results/methods_comparison/$a/units 2>/dev/null | wc -l); done
 squeue -u $USER
 
 # 5. assemble and score (CPU, after the arrays finish; also fine to run part-way)
-sbatch analysis1/slurm/score.sbatch      # -> results/analysis1/summary.md, scores.csv, figures/
+sbatch methods_comparison/slurm/score.sbatch      # -> results/methods_comparison/summary.md, scores.csv, figures/
 ```
 
-Arm A needs no GPU (`python analysis1/run.py run --arm A,A_linear`, a few seconds). Size NJOBS and
+Arm A needs no GPU (`python methods_comparison/run.py run --arm A,A_linear`, a few seconds). Size NJOBS and
 TIME from the smoke-test estimate. Every unit is written when it finishes and skipped when rerun, so a job
 that hits its time limit is simply resubmitted with the same command. Several worker processes share
 each GPU (`WORKERS`, default 4), since a single PSO run keeps a GPU only partly busy.
 
-Results go to `results/analysis1/` (or `$BVR_RESULTS`): `units/<arm>/*.json` per unit (poses, per-frame
-costs and timings), `tracks/<arm>/<trial>_o<offset>.npz` after `assemble`, then `scores.csv`, `summary.md`
-and `figures/`. Per-process logs are in `results/analysis1/logs/`.
+Results go to `results/methods_comparison/` in the repo (or `$BVR_RESULTS`), one folder per arm:
+
+```
+results/methods_comparison/
+  A/  B/  C/  ...            one folder per arm
+    units/*.json             one file per unit: poses, per-frame costs, timings, device
+    tracks/<trial>_o<offset>.npz   after `assemble`: {bone: (n_frames, 4, 4)}
+  scores.csv  summary.md  figures/   after `score.py`
+  logs/                      per-process logs (not committed)
+```
+
+Commit and push the results folder from the cluster when the runs finish (logs are git-ignored).
 
 ## Outcomes
 

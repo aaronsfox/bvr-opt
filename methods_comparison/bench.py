@@ -1,6 +1,6 @@
 """Time the expensive pieces on the current device, to size the SLURM arrays.
 
-    python analysis1/bench.py
+    python methods_comparison/bench.py
 
 Prints the time of one Autoscoper-replica cost evaluation (arm B: about 4,700 per bone-frame in the pilot)
 at full and 512 resolution, and of one co-fitted anchored-fit iteration (arm C: 90 per gap), and an

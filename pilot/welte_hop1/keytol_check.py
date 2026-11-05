@@ -20,7 +20,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-sys.path.insert(0, ROOT); sys.path.insert(0, os.path.join(ROOT, 'analysis1'))
+sys.path.insert(0, ROOT); sys.path.insert(0, os.path.join(ROOT, 'methods_comparison'))
 import torch  # noqa: E402
 
 from run import arm_cfg, f2f_for, setup_anchored, spline_track, trial  # noqa: E402

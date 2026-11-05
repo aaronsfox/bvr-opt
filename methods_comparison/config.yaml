@@ -1,4 +1,4 @@
-# Analysis 1: method comparison with perfect keyframes (see the plan doc, Study design).
+# Methods comparison with perfect keyframes (Analysis 1 in the plan doc, Study design).
 #
 # Keyframes are the bead-based reference poses every `spacing` frames, starting at each `offset`.
 # Frames strictly between the first and last keyframe are scored; frames outside them are not.

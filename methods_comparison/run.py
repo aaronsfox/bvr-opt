@@ -1,8 +1,8 @@
-"""Analysis 1 runner: splits every arm into independent units of work and runs them.
+"""Methods comparison runner (Analysis 1 in the plan doc): splits every arm into independent units of work and runs them.
 
-    python analysis1/run.py list   [--arm A,B,C]            # print the units (one per line)
-    python analysis1/run.py run    --arm B [--task 0 --ntasks 1] [--max-units N] [--frames 2]
-    python analysis1/run.py assemble                        # units -> one track per (arm, trial, offset)
+    python methods_comparison/run.py list   [--arm A,B,C]            # print the units (one per line)
+    python methods_comparison/run.py run    --arm B [--task 0 --ntasks 1] [--max-units N] [--quick]
+    python methods_comparison/run.py assemble                        # units -> one track per (arm, trial, offset)
 
 A unit is the smallest independent piece of an arm:
     A, A_linear                (trial, offset)               interpolation through the keyframes
@@ -12,8 +12,8 @@ A unit is the smallest independent piece of an arm:
     C_perframe                 (trial, offset, gap)          each frame of the gap fitted on its own
 
 `run` processes units[task::ntasks] and skips units whose output exists, so jobs can be resubmitted.
-Outputs go to $BVR_RESULTS (default <repo>/results/analysis1): units/<arm>/<unit>.json and, after
-`assemble`, tracks/<arm>/<trial>_o<offset>.npz with {bone: (n_frames, 4, 4)}: keyframes hold the given
+Outputs go to $BVR_RESULTS (default <repo>/results/methods_comparison), one folder per arm:
+<arm>/units/<unit>.json and, after `assemble`, <arm>/tracks/<trial>_o<offset>.npz with {bone: (n_frames, 4, 4)}: keyframes hold the given
 (reference) poses unless the arm moved or re-tracked them; NaN = not produced.
 """
 import argparse
@@ -40,9 +40,9 @@ from bvr_opt.io import Trial  # noqa: E402
 from bvr_opt.optim import autoscoper_optimize  # noqa: E402
 from bvr_opt.tracking import AnchoredFit, per_frame_fit  # noqa: E402
 
-CFG = yaml.safe_load(open(os.path.join(ROOT, 'analysis1', 'config.yaml')))
+CFG = yaml.safe_load(open(os.path.join(ROOT, 'methods_comparison', 'config.yaml')))
 QUICK = {}   # smoke-test overrides set from the command line (never used for real runs)
-RESULTS = os.environ.get('BVR_RESULTS', os.path.join(ROOT, 'results', 'analysis1'))
+RESULTS = os.environ.get('BVR_RESULTS', os.path.join(ROOT, 'results', 'methods_comparison'))
 
 
 def log(*a):
@@ -96,7 +96,7 @@ def unit_id(u):
 
 
 def unit_path(u):
-    return os.path.join(RESULTS, 'units', u['arm'], unit_id(u) + '.json')
+    return os.path.join(RESULTS, u['arm'], 'units', unit_id(u) + '.json')
 
 
 # ------------------------------------------------------------------------------------------- arms
@@ -271,7 +271,7 @@ def cmd_assemble(args):
                     for f, M in d.items(): tr[n][int(f)] = np.array(M)
             if missing == len(us):
                 continue
-            path = os.path.join(RESULTS, 'tracks', arm, f'{tn}_o{o}.npz'); os.makedirs(os.path.dirname(path), exist_ok=True)
+            path = os.path.join(RESULTS, arm, 'tracks', f'{tn}_o{o}.npz'); os.makedirs(os.path.dirname(path), exist_ok=True)
             np.savez(path, **tr)
             log(f'{arm} {tn} offset {o}: {len(us) - missing}/{len(us)} units' + (' (INCOMPLETE)' if missing else ''))
 

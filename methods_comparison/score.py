@@ -1,6 +1,6 @@
-"""Score every assembled Analysis 1 track against the bead-based reference, frame by frame.
+"""Score every assembled methods-comparison track against the bead-based reference, frame by frame.
 
-    python analysis1/score.py            # after `run.py assemble`
+    python methods_comparison/score.py            # after `run.py assemble`
 
 Scored frames: strictly between the first and last keyframe of each (trial, offset), keyframes excluded.
 Per bone: helical rotation (deg), helical translation along the axis (mm), pivot position error (mm).
@@ -75,7 +75,7 @@ def q95(x):
 
 def summary(df):
     arms = list(dict.fromkeys(df.arm))
-    out = ['# Analysis 1 results', '',
+    out = ['# Methods comparison results', '',
            'Pooled over trials and keyframe offsets; scored frames between keyframes only. '
            'Median [95th percentile].', '']
     for filt, title in (('none', 'Primary: unfiltered'), ('bw', 'Secondary: Butterworth 10 Hz on every arm')):
@@ -119,7 +119,7 @@ def figure(df, path):
             ax[i, j].set_yscale('log'); ax[i, j].axhline(TH['pivot_mm'] if m == 'pivot_mm' else TH['rot_deg'], color='0.6', ls='--', lw=0.8)
             if j == 0: ax[i, j].set_ylabel('Pivot error (mm)' if m == 'pivot_mm' else 'Helical rotation error (°)')
         ax[0, j].set_title(NAME[n])
-    fig.suptitle('Analysis 1: error against the bead-based reference (unfiltered; dashed: Welte operator standard)')
+    fig.suptitle('Methods comparison: error against the bead-based reference (unfiltered; dashed: Welte operator standard)')
     plt.tight_layout(); plt.savefig(path, dpi=110)
 
 
@@ -127,7 +127,7 @@ def main():
     sdfs = {tn: {n: collision.SDF(trial(tn).bones[n]) for n in BONES} for tn in CFG['trials']}
     rows = []
     for arm in CFG['arms']:
-        for p in sorted(glob.glob(os.path.join(RESULTS, 'tracks', arm, '*.npz'))):
+        for p in sorted(glob.glob(os.path.join(RESULTS, arm, 'tracks', '*.npz'))):
             tn, o = os.path.basename(p)[:-4].rsplit('_o', 1)
             rows += score_track(arm, tn, int(o), dict(np.load(p)), sdfs)
     df = pd.DataFrame(rows)
