@@ -1,0 +1,4 @@
+__pycache__/
+results/*/logs/
+mc-smoke-*.out
+mc-score-*.out

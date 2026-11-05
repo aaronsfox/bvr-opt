@@ -1,0 +1,32 @@
+# Methods comparison with perfect keyframes (Analysis 1 in the plan doc, Study design).
+#
+# Keyframes are the bead-based reference poses every `spacing` frames, starting at each `offset`.
+# Frames strictly between the first and last keyframe are scored; frames outside them are not.
+
+data_root: datasets/Welte2022/data/SOL001A
+trials: [T0014_hop108_0001, T0014_hop108_0002, T0019_jog0001, T000AssessmentTrial]
+bones: [tib, tal, cal]
+spacing: 10
+offsets: [0, 3, 5, 8]
+
+# Welte 2022 operator standard: frames worse than this would need correcting by hand
+correction_threshold: {pivot_mm: 1.0, rot_deg: 2.0}
+
+# Secondary post-processing, applied identically to every arm
+butterworth: {fs: 250.0, fc: 10.0, order: 2}
+
+arms:
+  # ---------------------------------------------------------------- main
+  A:            {kind: interp, interp: spline}
+  B:            {kind: autoscoper, render: full, image: full, guess: previous, restart: keyframe}
+  C:            {kind: anchored, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
+                 K: 3, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1], batch: 4, key_tol: null}
+  # ---------------------------------------------------------------- supplementary
+  A_linear:     {kind: interp, interp: linear}
+  B_512:        {kind: autoscoper, render: 512, image: 512, guess: previous, restart: keyframe}
+  B_akhbari:    {kind: autoscoper, render: full, image: full, guess: previous, restart: first, offsets: [0]}
+  C_alone:      {base: C, cofit: false}
+  C_drr:        {base: C, w_f2f: 0.0}
+  C_f2f:        {base: C, w_drr: 0.0}
+  C_nocontact:  {base: C, mu: 0.0}
+  C_perframe:   {kind: perframe, cofit: true, mu: 0.01, d_min: -2.0, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1]}
