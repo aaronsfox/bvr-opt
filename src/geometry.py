@@ -35,7 +35,7 @@ class Pose:
     def __init__(self, R, t, pivot):
         self.R = torch.as_tensor(np.asarray(R) if not torch.is_tensor(R) else R, dtype=torch.float64, device=DEVICE)
         self.t = torch.as_tensor(np.asarray(t) if not torch.is_tensor(t) else t, dtype=torch.float64, device=DEVICE)
-        self.pivot = torch.as_tensor(np.asarray(pivot), dtype=torch.float64, device=DEVICE)
+        self.pivot = torch.as_tensor(pivot if torch.is_tensor(pivot) else np.asarray(pivot), dtype=torch.float64, device=DEVICE)
 
     @classmethod
     def from_matrix(cls, M, pivot):

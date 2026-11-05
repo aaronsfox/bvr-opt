@@ -174,14 +174,14 @@ class AnchoredFit:
             for f in fs:
                 t_ = self.w['drr'] * ng * self.drr_frame(res, f) / len(fs)
                 if torch.is_tensor(t_):
-                    t_.backward(); d += float(t_)
+                    t_.backward(); d += float(t_.detach())
             terms['drr'] = d / self.w['drr'] / ng; total += d
         if self.w['f2f'] > 0:
             t_ = self.f2f_term(); (self.w['f2f'] * ng * t_).backward()
-            terms['f2f'] = float(t_); total += self.w['f2f'] * ng * float(t_)
+            t_ = float(t_.detach()); terms['f2f'] = t_; total += self.w['f2f'] * ng * t_
         if self.w['mu'] > 0 and len(self.names) > 1:
             t_ = self.contact_term(); (self.w['mu'] * ng * t_).backward()
-            terms['contact'] = float(t_); total += self.w['mu'] * ng * float(t_)
+            t_ = float(t_.detach()); terms['contact'] = t_; total += self.w['mu'] * ng * t_
         return total, terms
 
     def run(self):
