@@ -1,0 +1,57 @@
+grad:edges 1stMet 151: start 0.75mm 3.00deg -> end 1.02mm 2.94deg | cost end 1.2224 manual 1.2443 | 120 evals 38s
+grad:edges 1stMet 156: start 0.67mm 2.12deg -> end 1.36mm 4.83deg | cost end 1.2175 manual 1.2436 | 120 evals 37s
+grad:edges 1stMet 161: start 0.24mm 3.91deg -> end 0.87mm 1.06deg | cost end 1.1945 manual 1.2144 | 120 evals 37s
+grad:edges 1stMet 166: start 0.69mm 3.53deg -> end 2.45mm 3.66deg | cost end 1.2182 manual 1.1981 | 120 evals 36s
+grad:edges 1stMet 171: start 0.71mm 2.93deg -> end 1.96mm 2.34deg | cost end 1.2192 manual 1.1938 | 120 evals 36s
+grad:edges 2ndMet 171: start 0.85mm 0.70deg -> end 3.61mm 6.45deg | cost end 1.2047 manual 1.2348 | 120 evals 38s
+grad:edges 2ndMet 176: start 0.68mm 1.09deg -> end 3.42mm 7.13deg | cost end 1.2483 manual 1.2380 | 120 evals 37s
+grad:edges 1stPhal 156: start 0.83mm 2.69deg -> end 0.85mm 3.29deg | cost end 1.0427 manual 1.0786 | 120 evals 7s
+grad:edges 1stPhal 166: start 1.03mm 0.49deg -> end 1.04mm 6.17deg | cost end 1.0925 manual 1.2229 | 120 evals 6s
+grad:current 1stMet 151: start 0.75mm 3.00deg -> end 9.41mm 5.72deg | cost end 1.4616 manual 1.3157 | 120 evals 40s
+grad:current 1stMet 156: start 0.67mm 2.12deg -> end 9.30mm 8.81deg | cost end 1.4733 manual 1.3680 | 120 evals 37s
+grad:current 1stMet 161: start 0.24mm 3.91deg -> end 9.71mm 3.99deg | cost end 1.4998 manual 1.2866 | 120 evals 37s
+grad:current 1stMet 166: start 0.69mm 3.53deg -> end 10.03mm 7.90deg | cost end 1.4983 manual 1.2425 | 120 evals 36s
+grad:current 1stMet 171: start 0.71mm 2.93deg -> end 9.47mm 4.81deg | cost end 1.5351 manual 1.2813 | 120 evals 37s
+grad:current 2ndMet 171: start 0.85mm 0.70deg -> end 7.45mm 9.12deg | cost end 1.2489 manual 1.3064 | 120 evals 41s
+grad:current 2ndMet 176: start 0.68mm 1.09deg -> end 7.12mm 7.48deg | cost end 1.1836 manual 1.3554 | 120 evals 41s
+grad:current 1stPhal 156: start 0.83mm 2.69deg -> end 1.77mm 7.63deg | cost end 1.2000 manual 1.2670 | 120 evals 7s
+grad:current 1stPhal 166: start 1.03mm 0.49deg -> end 1.72mm 9.05deg | cost end 1.1763 manual 1.2919 | 120 evals 7s
+grad:lcn 1stMet 151: start 0.75mm 3.00deg -> end 0.57mm 4.37deg | cost end 0.9251 manual 0.9549 | 120 evals 46s
+grad:lcn 1stMet 156: start 0.67mm 2.12deg -> end 0.42mm 5.64deg | cost end 0.9098 manual 0.9878 | 120 evals 43s
+grad:lcn 1stMet 161: start 0.24mm 3.91deg -> end 0.20mm 4.78deg | cost end 0.9113 manual 0.9698 | 120 evals 42s
+grad:lcn 1stMet 166: start 0.69mm 3.53deg -> end 0.41mm 2.87deg | cost end 0.9035 manual 0.9530 | 120 evals 44s
+grad:lcn 1stMet 171: start 0.71mm 2.93deg -> end 0.40mm 5.52deg | cost end 0.8967 manual 0.9923 | 120 evals 42s
+grad:lcn 2ndMet 171: start 0.85mm 0.70deg -> end 8.13mm 5.87deg | cost end 0.9947 manual 1.4397 | 120 evals 47s
+grad:lcn 2ndMet 176: start 0.68mm 1.09deg -> end 8.05mm 3.93deg | cost end 1.0107 manual 1.4519 | 120 evals 46s
+grad:lcn 1stPhal 156: start 0.83mm 2.69deg -> end 1.08mm 8.21deg | cost end 1.0778 manual 1.1998 | 120 evals 8s
+grad:lcn 1stPhal 166: start 1.03mm 0.49deg -> end 1.12mm 9.63deg | cost end 1.0655 manual 1.2640 | 120 evals 8s
+grad:raw 1stMet 151: start 0.75mm 3.00deg -> end 10.10mm 5.98deg | cost end 1.5171 manual 1.3700 | 120 evals 38s
+grad:raw 1stMet 156: start 0.67mm 2.12deg -> end 10.14mm 7.18deg | cost end 1.5393 manual 1.4321 | 120 evals 35s
+grad:raw 1stMet 161: start 0.24mm 3.91deg -> end 11.90mm 3.63deg | cost end 1.5372 manual 1.3376 | 120 evals 35s
+grad:raw 1stMet 166: start 0.69mm 3.53deg -> end 8.00mm 6.32deg | cost end 1.5731 manual 1.3162 | 120 evals 35s
+grad:raw 1stMet 171: start 0.71mm 2.93deg -> end 4.35mm 6.70deg | cost end 1.5798 manual 1.3397 | 120 evals 36s
+grad:raw 2ndMet 171: start 0.85mm 0.70deg -> end 2.06mm 5.40deg | cost end 1.2599 manual 1.2621 | 120 evals 41s
+grad:raw 2ndMet 176: start 0.68mm 1.09deg -> end 1.44mm 6.48deg | cost end 1.2009 manual 1.3070 | 120 evals 38s
+grad:raw 1stPhal 156: start 0.83mm 2.69deg -> end 1.28mm 7.05deg | cost end 1.0658 manual 1.1078 | 120 evals 5s
+grad:raw 1stPhal 166: start 1.03mm 0.49deg -> end 1.41mm 8.99deg | cost end 1.0957 manual 1.1661 | 120 evals 5s
+pso:current 1stMet 151: start 0.75mm 3.00deg -> end 1.28mm 50.85deg | cost end 1.0186 manual 1.3157 | 2838 evals 470s
+joint:edges 2ndMet 171: start 0.85mm 0.70deg -> end 2.95mm 5.46deg | cost end 1.2001 manual 1.2368 | 67s
+joint:edges 2ndMet 176: start 0.68mm 1.09deg -> end 1.27mm 5.80deg | cost end 1.2187 manual 1.2619 | 71s
+joint:lcn 2ndMet 171: start 0.85mm 0.70deg -> end 8.34mm 6.77deg | cost end 0.9278 manual 1.2673 | 77s
+joint:lcn 2ndMet 176: start 0.68mm 1.09deg -> end 8.04mm 4.55deg | cost end 0.9725 manual 1.3249 | 79s
+joint:raw 2ndMet 171: start 0.85mm 0.70deg -> end 4.33mm 3.62deg | cost end 1.3106 manual 1.3734 | 69s
+joint:raw 2ndMet 176: start 0.68mm 1.09deg -> end 4.18mm 4.32deg | cost end 1.3669 manual 1.4111 | 73s
+JOINTDONE
+h2:gradcorr 1stMet 151: start 0.75mm 3.00deg -> end 0.45mm 1.00deg | cost end 1.0961 manual 1.1144 | 35s
+h2:gradcorr 1stMet 156: start 0.67mm 2.12deg -> end 0.54mm 1.92deg | cost end 0.7292 manual 0.7887 | 69s
+h2:gradcorr 1stMet 161: start 0.24mm 3.91deg -> end 0.25mm 5.58deg | cost end 1.0842 manual 1.1099 | 33s
+h2:gradcorr 1stMet 166: start 0.69mm 3.53deg -> end 0.40mm 2.34deg | cost end 0.7314 manual 0.7868 | 67s
+h2:gradcorr 1stMet 171: start 0.71mm 2.93deg -> end 0.26mm 3.06deg | cost end 0.9606 manual 0.9834 | 62s
+h2:gradcorr 2ndMet 171: start 0.85mm 0.70deg -> end 0.73mm 3.95deg | cost end 1.0657 manual 1.1670 | 68s
+h2:gradcorr 2ndMet 176: start 0.68mm 1.09deg -> end 0.94mm 4.60deg | cost end 1.0817 manual 1.1613 | 72s
+h2:gradcorr 1stPhal 156: start 0.83mm 2.69deg -> end 0.52mm 4.01deg | cost end 0.5466 manual 0.5649 | 15s
+h2:gradcorr 1stPhal 166: start 1.03mm 0.49deg -> end 0.95mm 7.21deg | cost end 0.5949 manual 0.6583 | 14s
+h2:log+gradcorr 1stMet 151: start 0.75mm 3.00deg -> end 0.32mm 3.49deg | cost end 1.3040 manual 1.3326 | 32s
+h2:log+gradcorr 1stMet 156: start 0.67mm 2.12deg -> end 0.41mm 2.64deg | cost end 0.9229 manual 0.9917 | 69s
+h2:log+gradcorr 1stMet 161: start 0.24mm 3.91deg -> end 0.29mm 5.92deg | cost end 1.2694 manual 1.3078 | 33s
+h2:log+gradcorr 1stMet 166: start 0.69mm 3.53deg -> end 0.30mm 2.88deg | cost end 0.8914 manual 0.9353 | 69s

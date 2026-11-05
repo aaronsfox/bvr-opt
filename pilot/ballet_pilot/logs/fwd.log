@@ -1,0 +1,17 @@
+fwd 1stMet+2ndMet 1stMet @151 (5 frames from start): 0.48mm 4.65deg  [121s]
+fwd 1stMet+2ndMet 1stMet @156 (10 frames from start): 0.37mm 3.92deg  [252s]
+fwd 1stMet+2ndMet 2ndMet @156 (10 frames from start): 0.10mm 5.32deg  [252s]
+fwd 1stMet+2ndMet 1stMet @161 (15 frames from start): 0.26mm 4.04deg  [378s]
+fwd 1stMet+2ndMet 1stMet @166 (20 frames from start): 0.39mm 3.07deg  [512s]
+fwd 1stMet+2ndMet 2ndMet @166 (20 frames from start): 0.55mm 10.46deg  [512s]
+fwd 1stMet+2ndMet 1stMet @171 (25 frames from start): 0.22mm 3.98deg  [638s]
+fwd 1stMet+2ndMet 2ndMet @171 (25 frames from start): 0.64mm 12.86deg  [638s]
+fwd 1stMet+2ndMet 1stMet @176 (30 frames from start): 0.72mm 3.14deg  [764s]
+fwd 1stMet+2ndMet 2ndMet @176 (30 frames from start): 0.91mm 15.43deg  [764s]
+fwd 1stMet+2ndMet 1stMet @177 (31 frames from start): 0.19mm 3.64deg  [789s]
+FWDDONE
+fwd 1stPhal 1stPhal @156 (10 frames from start): 0.74mm 4.53deg  [25s]
+fwd 1stPhal 1stPhal @166 (20 frames from start): 1.31mm 13.76deg  [47s]
+fwd 1stPhal 1stPhal @176 (30 frames from start): 0.58mm 19.96deg  [71s]
+FWDDONE
+FWDQUEUEDONE

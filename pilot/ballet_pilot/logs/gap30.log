@@ -1,0 +1,33 @@
+  res 256 done, loss 1.6596, 104s
+  res 512 done, loss 1.4517, 449s
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 1stMet @151: interp 1.73mm 5.56deg -> 0.60mm 5.29deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 1stMet @156: interp 2.17mm 5.74deg -> 0.55mm 5.50deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 1stMet @161: interp 1.68mm 7.39deg -> 0.22mm 7.10deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 1stMet @166: interp 1.94mm 2.04deg -> 0.23mm 1.69deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 1stMet @171: interp 1.61mm 2.59deg -> 0.27mm 2.44deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 2ndMet @156: interp 1.16mm 2.02deg -> 0.09mm 2.17deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 2ndMet @166: interp 1.82mm 1.82deg -> 0.63mm 1.89deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-176 2ndMet @171: interp 1.74mm 0.48deg -> 0.63mm 0.64deg
+F2FRUNDONE
+  res 256 done, loss 1.0166, 13s
+  res 512 done, loss 1.0152, 37s
+f2f:drr1_f2f2_K3 1stPhal 146-176 1stPhal @156: interp 0.89mm 3.45deg -> 0.51mm 2.03deg
+f2f:drr1_f2f2_K3 1stPhal 146-176 1stPhal @166: interp 1.13mm 1.61deg -> 0.67mm 0.92deg
+F2FRUNDONE
+  res 256 done, loss 1.6585, 88s
+  res 512 done, loss 1.4497, 423s
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 1stMet @151: interp 1.73mm 5.56deg -> 0.53mm 5.26deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 1stMet @156: interp 2.17mm 5.74deg -> 0.61mm 5.53deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 1stMet @161: interp 1.68mm 7.39deg -> 0.20mm 7.06deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 1stMet @166: interp 1.94mm 2.04deg -> 0.28mm 1.76deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 1stMet @171: interp 1.61mm 2.59deg -> 0.26mm 2.53deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 2ndMet @156: interp 1.16mm 2.02deg -> 0.05mm 2.13deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 2ndMet @166: interp 1.82mm 1.82deg -> 0.68mm 1.78deg
+f2f:drr1_f2f2_K5 1stMet+2ndMet 146-176 2ndMet @171: interp 1.74mm 0.48deg -> 0.58mm 0.71deg
+F2FRUNDONE
+  res 256 done, loss 1.0215, 14s
+  res 512 done, loss 1.0122, 41s
+f2f:drr1_f2f2_K5 1stPhal 146-176 1stPhal @156: interp 0.89mm 3.45deg -> 0.51mm 2.38deg
+f2f:drr1_f2f2_K5 1stPhal 146-176 1stPhal @166: interp 1.13mm 1.61deg -> 0.71mm 0.86deg
+F2FRUNDONE
+GAP30DONE

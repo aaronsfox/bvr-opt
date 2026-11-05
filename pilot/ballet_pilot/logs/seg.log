@@ -1,0 +1,29 @@
+  res 256 done, loss 3.0696, 62s
+  res 512 done, loss 2.1621, 332s
+seg:edges 1stMet+2ndMet 166-176 1stMet @171: interp 0.71mm 2.93deg -> segment 0.32mm 2.77deg
+seg:edges 1stMet+2ndMet 166-176 2ndMet @171: interp 0.85mm 0.70deg -> segment 0.51mm 0.64deg
+SEGDONE
+  res 256 done, loss 1.8456, 18s
+  res 512 done, loss 1.2014, 96s
+seg:edges 2ndMet 166-176 2ndMet @171: interp 0.85mm 0.70deg -> segment 0.89mm 0.85deg
+SEGDONE
+  res 256 done, loss 1.1683, 6s
+  res 512 done, loss 1.1903, 22s
+seg:lcn 1stPhal 146-166 1stPhal @156: interp 0.83mm 2.69deg -> segment 0.50mm 1.74deg
+SEGDONE
+  res 256 done, loss 0.9780, 6s
+  res 512 done, loss 1.1889, 21s
+seg:lcn 1stPhal 156-176 1stPhal @166: interp 1.03mm 0.49deg -> segment 0.51mm 1.53deg
+SEGDONE
+  res 256 done, loss 3.0293, 61s
+  res 512 done, loss 2.1106, 362s
+seg:edges 1stMet+2ndMet 146-166 1stMet @151: interp 1.71mm 5.19deg -> segment 0.94mm 4.65deg
+seg:edges 1stMet+2ndMet 146-166 1stMet @156: interp 2.05mm 5.27deg -> segment 0.92mm 5.07deg
+seg:edges 1stMet+2ndMet 146-166 1stMet @161: interp 1.13mm 6.30deg -> segment 0.69mm 5.97deg
+seg:edges 1stMet+2ndMet 146-166 2ndMet @156: interp 1.08mm 1.11deg -> segment 0.64mm 1.56deg
+SEGDONE
+  res 256 done, loss 1.3092, 37s
+  res 512 done, loss 0.9496, 156s
+seg:lcn 1stMet 156-166 1stMet @161: interp 0.24mm 3.91deg -> segment 0.20mm 3.87deg
+SEGDONE
+QUEUEDONE

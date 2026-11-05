@@ -1,0 +1,61 @@
+  res 256 done, loss 0.2316, 6s
+  res 512 done, loss 0.2314, 12s
+f2f:drr0_f2f1_K3 1stMet+2ndMet 166-176 1stMet @171: interp 0.71mm 2.93deg -> 0.50mm 2.95deg
+f2f:drr0_f2f1_K3 1stMet+2ndMet 166-176 2ndMet @171: interp 0.85mm 0.70deg -> 0.61mm 0.81deg
+F2FRUNDONE
+  res 256 done, loss 0.2250, 10s
+  res 512 done, loss 0.2249, 22s
+f2f:drr0_f2f1_K3 1stMet+2ndMet 146-166 1stMet @151: interp 1.71mm 5.19deg -> 1.04mm 5.16deg
+f2f:drr0_f2f1_K3 1stMet+2ndMet 146-166 1stMet @156: interp 2.05mm 5.27deg -> 1.30mm 5.27deg
+f2f:drr0_f2f1_K3 1stMet+2ndMet 146-166 1stMet @161: interp 1.13mm 6.30deg -> 0.73mm 6.26deg
+f2f:drr0_f2f1_K3 1stMet+2ndMet 146-166 2ndMet @156: interp 1.08mm 1.11deg -> 0.43mm 1.32deg
+F2FRUNDONE
+  res 256 done, loss 0.1265, 5s
+  res 512 done, loss 0.1265, 11s
+f2f:drr0_f2f1_K3 1stPhal 146-166 1stPhal @156: interp 0.83mm 2.69deg -> 0.67mm 2.61deg
+F2FRUNDONE
+  res 256 done, loss 0.1255, 5s
+  res 512 done, loss 0.1254, 11s
+f2f:drr0_f2f1_K3 1stPhal 156-176 1stPhal @166: interp 1.03mm 0.49deg -> 0.59mm 0.38deg
+F2FRUNDONE
+  res 256 done, loss 1.6560, 61s
+  res 512 done, loss 1.4914, 351s
+f2f:drr1_f2f2_K3 1stMet+2ndMet 166-176 1stMet @171: interp 0.71mm 2.93deg -> 0.18mm 2.77deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 166-176 2ndMet @171: interp 0.85mm 0.70deg -> 0.51mm 0.56deg
+F2FRUNDONE
+  res 256 done, loss 1.0948, 10s
+  res 512 done, loss 0.9789, 31s
+f2f:drr1_f2f2_K3 1stPhal 146-166 1stPhal @156: interp 0.83mm 2.69deg -> 0.52mm 1.74deg
+F2FRUNDONE
+  res 256 done, loss 0.9636, 10s
+  res 512 done, loss 0.9829, 28s
+f2f:drr1_f2f2_K3 1stPhal 156-176 1stPhal @166: interp 1.03mm 0.49deg -> 0.76mm 0.88deg
+F2FRUNDONE
+  res 256 done, loss 1.6548, 68s
+  res 512 done, loss 1.4600, 347s
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-166 1stMet @151: interp 1.71mm 5.19deg -> 0.57mm 4.84deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-166 1stMet @156: interp 2.05mm 5.27deg -> 0.71mm 5.06deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-166 1stMet @161: interp 1.13mm 6.30deg -> 0.33mm 6.14deg
+f2f:drr1_f2f2_K3 1stMet+2ndMet 146-166 2ndMet @156: interp 1.08mm 1.11deg -> 0.11mm 1.63deg
+F2FRUNDONE
+  res 256 done, loss 1.1966, 56s
+  res 512 done, loss 1.0190, 320s
+f2f:drr1_f2f0_K3 1stMet+2ndMet 166-176 1stMet @171: interp 0.71mm 2.93deg -> 0.21mm 2.76deg
+f2f:drr1_f2f0_K3 1stMet+2ndMet 166-176 2ndMet @171: interp 0.85mm 0.70deg -> 0.58mm 0.45deg
+F2FRUNDONE
+  res 256 done, loss 0.8426, 5s
+  res 512 done, loss 0.7257, 19s
+f2f:drr1_f2f0_K3 1stPhal 146-166 1stPhal @156: interp 0.83mm 2.69deg -> 0.47mm 1.74deg
+F2FRUNDONE
+  res 256 done, loss 0.7295, 5s
+  res 512 done, loss 0.7382, 18s
+f2f:drr1_f2f0_K3 1stPhal 156-176 1stPhal @166: interp 1.03mm 0.49deg -> 0.65mm 1.03deg
+F2FRUNDONE
+  res 256 done, loss 1.2163, 58s
+  res 512 done, loss 1.0239, 334s
+f2f:drr1_f2f0_K3 1stMet+2ndMet 146-166 1stMet @151: interp 1.71mm 5.19deg -> 0.56mm 4.99deg
+f2f:drr1_f2f0_K3 1stMet+2ndMet 146-166 1stMet @156: interp 2.05mm 5.27deg -> 0.72mm 5.07deg
+f2f:drr1_f2f0_K3 1stMet+2ndMet 146-166 1stMet @161: interp 1.13mm 6.30deg -> 0.40mm 6.22deg
+f2f:drr1_f2f0_K3 1stMet+2ndMet 146-166 2ndMet @156: interp 1.08mm 1.11deg -> 0.41mm 1.60deg
+F2FRUNDONE
+F2FQUEUEDONE
