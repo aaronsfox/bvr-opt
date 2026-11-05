@@ -1,0 +1,35 @@
+# Python packages for bvr-opt (Python 3.12)
+#
+# Set up a virtual environment named bvr_opt:
+#   python3.12 -m venv ~/venvs/bvr_opt
+#   source ~/venvs/bvr_opt/bin/activate
+#   pip install --upgrade pip
+#   pip install -r requirements.txt
+#
+# PyTorch comes from the CPU-only wheel index below (smaller, and what the CPU
+# array jobs on the cluster need). For a GPU environment, install the CUDA build
+# matching the cluster's driver instead, e.g.
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Numerics and analysis
+numpy>=2.0
+scipy>=1.13
+pandas>=2.2
+
+# Images and volumes (TIFF reading/writing, incl. LZW/zlib compression)
+tifffile>=2024.8
+imagecodecs>=2024.6
+scikit-image>=0.24
+pillow>=10.0
+
+# Figures
+matplotlib>=3.9
+
+# Job configs and notebooks
+pyyaml>=6.0
+ipykernel
+
+# Differentiable DRR rendering and optimisation
+torch>=2.4
