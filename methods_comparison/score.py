@@ -9,9 +9,11 @@ surface separation (PV volumes, signed distance field). Every arm is scored unfi
 after the same dual-pass Butterworth filter (secondary). A frame "needs correction" when pivot error
 > 1 mm or helical rotation > 2 deg (Welte 2022 operator standard).
 
-Writes $BVR_RESULTS/scores.csv, summary.md and figures/.
+Writes $BVR_RESULTS/scores.csv, compute.csv, summary.md and figures/. The summary ends with a compute table
+(renders and wall time per bone-frame for each arm, read from the unit files).
 """
 import glob
+import json
 import os
 import sys
 
@@ -123,6 +125,48 @@ def figure(df, path):
     plt.tight_layout(); plt.savefig(path, dpi=110)
 
 
+def compute_table(arms):
+    """Compute cost per arm from the unit files (implementation-independent counts first, then wall time).
+
+    Renders per bone-frame = DRR renders of one bone in both views needed per scored bone-frame:
+      pso_simplex arms: Autoscoper cost evaluations (one render each);
+      new_opt arms: iterations x frames sampled per gap / frames in the gap (co-fitted bones share a render
+        pass, each with gradients); new_opt_per_frame: iterations per frame; interpolation: 0.
+    Wall time per bone-frame = unit time / bone-frames it produced, on the recorded device. Several worker
+    processes may share one GPU (column `workers`), which inflates wall time relative to a dedicated GPU."""
+    rows = []
+    for arm in arms:
+        for p in glob.glob(os.path.join(RESULTS, arm, 'units', '*.json')):
+            d = json.load(open(p)); c = d['config']
+            n_bf = sum(len(v) for v in d['poses'].values())
+            if n_bf == 0:
+                continue
+            if c['kind'] == 'autoscoper':
+                renders = sum(m['evals'] for m in d['meta'].values()) / n_bf
+            elif c['kind'] == 'anchored':
+                inner = d['unit']['b'] - d['unit']['a'] - 1
+                renders = sum(c['iters']) * min(c['batch'], inner) / inner
+            elif c['kind'] == 'perframe':
+                renders = sum(c['iters'])
+            else:
+                renders = 0.0
+            rows.append(dict(arm=arm, bone_frames=n_bf, renders=renders, sec=d['sec'], sec_per_bf=d['sec'] / n_bf,
+                             device=d.get('gpu') or d.get('device'), workers=d.get('workers', 1)))
+    if not rows:
+        return '', None
+    cdf = pd.DataFrame(rows)
+    out = ['## Compute', '',
+           'Renders per bone-frame: DRR renders of one bone (both views) per scored bone-frame; with gradients for '
+           'new_opt arms. Wall time on the recorded device, with `workers` processes sharing it.', '',
+           '| Arm | Bone-frames | Renders per bone-frame | Wall time per bone-frame (s) | Total compute (device-hours) | Device | Workers |',
+           '|---|---|---|---|---|---|---|']
+    for arm, g in cdf.groupby('arm', sort=False):
+        out.append(f'| {arm} | {g.bone_frames.sum()} | {(g.renders * g.bone_frames).sum() / g.bone_frames.sum():.0f} | '
+                   f'{g.sec.sum() / g.bone_frames.sum():.2f} | {g.sec.sum() / 3600:.2f} | {g.device.iloc[0]} | '
+                   f'{int(g.workers.max())} |')
+    return '\n'.join(out) + '\n', cdf
+
+
 def main():
     sdfs = {tn: {n: collision.SDF(trial(tn).bones[n]) for n in BONES} for tn in CFG['trials']}
     rows = []
@@ -132,7 +176,10 @@ def main():
             rows += score_track(arm, tn, int(o), dict(np.load(p)), sdfs)
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(RESULTS, 'scores.csv'), index=False)
-    s = summary(df); open(os.path.join(RESULTS, 'summary.md'), 'w').write(s); print(s)
+    comp, cdf = compute_table([a for a in CFG['arms']])
+    if cdf is not None:
+        cdf.to_csv(os.path.join(RESULTS, 'compute.csv'), index=False)
+    s = summary(df) + '\n' + comp; open(os.path.join(RESULTS, 'summary.md'), 'w').write(s); print(s)
     os.makedirs(os.path.join(RESULTS, 'figures'), exist_ok=True)
     figure(df, os.path.join(RESULTS, 'figures', 'errors_by_arm.png'))
 

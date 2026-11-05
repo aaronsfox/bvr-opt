@@ -57,7 +57,7 @@ results/methods_comparison/
   keyframe_interp/  pso_simplex/  new_opt/  ...   one folder per arm
     units/*.json                  one file per unit: poses, per-frame costs, timings, device
     tracks/<trial>_o<offset>.npz  after `assemble`: {bone: (n_frames, 4, 4)}
-  scores.csv  summary.md  figures/                after `score.py`
+  scores.csv  compute.csv  summary.md  figures/   after `score.py`
   logs/                                           per-process logs (not committed)
 ```
 
@@ -69,6 +69,8 @@ Commit and push the results folder from the cluster when the runs finish.
 and helical rotation per bone, talus–calcaneus relative rotation, and the share of bone-frames that miss
 Welte's operator standard (pivot error > 1 mm or rotation > 2°), i.e. frames an operator would expect to
 correct. Unfiltered is primary; the same 10 Hz Butterworth filter on every arm is secondary.
+A compute table follows: DRR renders and wall time per bone-frame for each arm (from the unit files;
+`compute.csv`), so compute can be compared independently of how fast our implementation is.
 
 ## Device
 

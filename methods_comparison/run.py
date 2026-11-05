@@ -227,7 +227,9 @@ def run_unit(u, max_frames=None):
     out = dict(unit=u, config=c, poses={n: {str(f): M for f, M in p.items()} for n, p in poses.items()},
                meta={str(k): v for k, v in meta.items()}, sec=time.time() - t0, host=socket.gethostname(),
                device=str(DEVICE), torch=torch.__version__,
-               gpu=torch.cuda.get_device_name() if DEVICE.type == 'cuda' else None)
+               gpu=torch.cuda.get_device_name() if DEVICE.type == 'cuda' else None,
+               workers=int(os.environ.get('WORKERS', '1')), threads=torch.get_num_threads(),
+               slurm_job=os.environ.get('SLURM_JOB_ID'))
     return out
 
 
