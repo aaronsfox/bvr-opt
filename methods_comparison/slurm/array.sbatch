@@ -7,9 +7,14 @@ source methods_comparison/slurm/common.sh
 WORKERS=${WORKERS:-4}
 NT=$(( SLURM_ARRAY_TASK_COUNT * WORKERS ))
 export THREADS=$(( SLURM_CPUS_PER_TASK / WORKERS > 0 ? SLURM_CPUS_PER_TASK / WORKERS : 1 ))
+PIDS=()
 for j in $(seq 0 $(( WORKERS - 1 ))); do
   T=$(( SLURM_ARRAY_TASK_ID * WORKERS + j ))
   python methods_comparison/run.py run --arm "$ARM" --task $T --ntasks $NT \
     > "$BVR_RESULTS/logs/${ARM//,/+}_${SLURM_ARRAY_JOB_ID}_${T}.log" 2>&1 &
+  PIDS+=($!)
 done
-wait
+# Fail the job (state FAILED in sacct) if any worker exits with an error, so crashes are not hidden
+FAIL=0
+for p in "${PIDS[@]}"; do wait "$p" || FAIL=1; done
+if [ $FAIL -ne 0 ]; then echo "a worker failed: see $BVR_RESULTS/logs/${ARM//,/+}_${SLURM_ARRAY_JOB_ID}_*.log"; exit 1; fi
