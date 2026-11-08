@@ -7,7 +7,7 @@ ARM=${1:-new_opt}
 cd "$(dirname "$0")/../.."
 bash keyframe_gaps/slurm/submit.sh "$ARM" 5    2 4 06:00:00
 bash keyframe_gaps/slurm/submit.sh "$ARM" 10   1 4 06:00:00
-bash keyframe_gaps/slurm/submit.sh "$ARM" 20   1 4 08:00:00
-bash keyframe_gaps/slurm/submit.sh "$ARM" 30   1 4 08:00:00
-bash keyframe_gaps/slurm/submit.sh "$ARM" 40   1 4 08:00:00
-bash keyframe_gaps/slurm/submit.sh "$ARM" full 1 4 08:00:00
+bash keyframe_gaps/slurm/submit.sh "$ARM" 20 1 4 12:00:00
+bash keyframe_gaps/slurm/submit.sh "$ARM" 30 1 4 12:00:00
+bash keyframe_gaps/slurm/submit.sh "$ARM" 40 1 4 12:00:00
+bash keyframe_gaps/slurm/submit.sh "$ARM" full 1 4 12:00:00

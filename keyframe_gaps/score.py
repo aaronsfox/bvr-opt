@@ -34,6 +34,8 @@ BONES = CFG['bones']; JOINTS = [('tib', 'tal'), ('tal', 'cal')]
 NAME = {'tib': 'Tibia', 'tal': 'Talus', 'cal': 'Calcaneus'}
 TH = CFG['correction_threshold']
 SP = [str(s) for s in CFG['spacings']]
+# arms to score: configured arms, plus the chains-only path of stepwise arms (written by run.py assemble)
+ARMS = [x for a, c in CFG['arms'].items() for x in ([a, a + '_chains'] if c['kind'] == 'stepwise' else [a])]
 
 
 def needs_correction(d):
@@ -76,7 +78,7 @@ def table(df, title, note):
     out = [f'## {title}', '', note, '',
            '| Arm | Spacing | Bone-frames | ' + ' | '.join(f'{NAME[n]} pivot mm | {NAME[n]} rot °' for n in BONES) +
            ' | Max pivot mm | Tal–cal rot ° | Needs correction % |', '|' + '---|' * (3 + 2 * len(BONES) + 3)]
-    for arm in CFG['arms']:
+    for arm in ARMS:
         for s in SP:
             d = df[(df.arm == arm) & (df.spacing == s)]
             if d.empty:
@@ -94,7 +96,7 @@ def table(df, title, note):
 def by_trial(df):
     out = ['## Frames needing correction by trial (% of bone-frames; gap lengths used in brackets)', '',
            '| Arm | Spacing | ' + ' | '.join(CFG['trials']) + ' |', '|' + '---|' * (2 + len(CFG['trials']))]
-    for arm in CFG['arms']:
+    for arm in ARMS:
         for s in SP:
             d = df[(df.arm == arm) & (df.spacing == s) & df.item.isin(BONES)]
             if d.empty:
@@ -115,7 +117,7 @@ def by_distance(df):
     t = b.pivot_table(index=['arm', 'spacing'], columns='to_key_bin', values='pivot_mm', aggfunc='median', observed=False)
     out = ['## Median pivot error (mm) by distance to the nearest keyframe (frames)', '',
            '| Arm | Spacing | ' + ' | '.join(map(str, t.columns)) + ' |', '|' + '---|' * (2 + len(t.columns))]
-    for arm in CFG['arms']:
+    for arm in ARMS:
         for s in SP:
             if (arm, s) in t.index:
                 out.append(f'| {arm} | {s} | ' + ' | '.join('–' if np.isnan(v) else f'{v:.2f}' for v in t.loc[(arm, s)]) + ' |')
@@ -146,7 +148,7 @@ def compute(arms):
 
 
 def figure(df, path):
-    arms = [a for a in CFG['arms'] if (df.arm == a).any()]
+    arms = [a for a in ARMS if (df.arm == a).any()]
     fig, ax = plt.subplots(1, 3, figsize=(16, 4.6))
     x = np.arange(len(SP))
     for i, arm in enumerate(arms):
@@ -167,7 +169,7 @@ def figure(df, path):
 def main():
     sdfs = {tn: {n: collision.SDF(trial(tn).bones[n]) for n in BONES} for tn in CFG['trials']}
     rows = []
-    for arm in CFG['arms']:
+    for arm in ARMS:
         for s in SP:
             for p in sorted(glob.glob(os.path.join(arm_dir(arm, s), 'tracks', '*.npz'))):
                 tn = os.path.basename(p)[:-4]; rows += score_track(arm, s, tn, dict(np.load(p)), sdfs[tn])

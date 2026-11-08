@@ -243,3 +243,74 @@ def per_frame_fit(trial, views, fovs, sdfs, names, f, base, cofit=True, mu=0.0, 
         for n in names:
             R, t = P0[n].apply(X[n]); M = np.eye(4); M[:3, :3] = to_np(R); M[:3, 3] = to_np(t); out[(n, f)] = M
     return out, time.time() - t0
+
+
+# ------------------------------------------------------------------------------------------- stepwise chains
+def step_fit(trial, views, fovs, f2f, sdfs, names, f, init, pts, prev=None, prev_frame=None, w_drr=1.0, w_f2f=2.0,
+             mu=0.0, d_min=0.0, res=(256, 512), iters=(20, 20), lrs=(0.2, 0.05)):
+    """Fit frame f on its own (bones co-fitted), starting from init {n: 4x4}. If prev {n: 4x4} is given (the
+    already-fitted neighbouring frame prev_frame = f - 1 or f + 1, held fixed), the frame-to-frame term links
+    f to it. Objective: w_drr * DRR term + w_f2f * frame-to-frame term + mu * contact. Returns {n: 4x4}."""
+    P0 = {n: Pose.from_matrix(init[n], trial.bones[n].pivot) for n in names}
+    X = {n: torch.zeros(6, dtype=torch.float64, requires_grad=True) for n in names}
+    prevW = {}
+    if prev is not None and w_f2f > 0:
+        for n in names:
+            M = torch.tensor(prev[n], dtype=torch.float64); prevW[n] = pts[n] @ M[:3, :3].T + M[:3, 3]
+    for r, it, lr in zip(res, iters, lrs):
+        opt = torch.optim.Adam(list(X.values()), lr=lr); sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, it)
+        rads = [trial.image(ci, f, r) for ci in range(len(trial.cams))]
+        for k in range(it):
+            opt.zero_grad()
+            poses = {n: P0[n].apply(X[n]) for n in names}
+            L = 0
+            if w_drr > 0:
+                t_, c_ = drr_term(views[r], rads, fovs, trial.bones, poses)
+                L = L + w_drr * t_ / max(c_, 1)
+            if prevW:
+                tot, cnt = 0, 0
+                for n in names:
+                    R, t = poses[n]; W = pts[n] @ R.T + t
+                    t_, c_ = f2f.pair(prevW[n], W, prev_frame) if prev_frame < f else f2f.pair(W, prevW[n], f)
+                    tot, cnt = tot + t_, cnt + c_
+                L = L + w_f2f * tot / max(cnt, 1)
+            if mu > 0 and len(names) > 1:
+                L = L + mu * collision.penalty(sdfs, poses, d_min)
+            if torch.is_tensor(L) and L.requires_grad:
+                L.backward(); opt.step()
+            sch.step()
+    out = {}
+    with torch.no_grad():
+        for n in names:
+            R, t = P0[n].apply(X[n]); M = np.eye(4); M[:3, :3] = to_np(R); M[:3, 3] = to_np(t); out[n] = M
+    return out
+
+
+def chain(trial, views, fovs, f2f, sdfs, names, key, frames, direction, first_guess, pts, **kw):
+    """Step frame by frame from keyframe `key` through `frames` (in stepping order, e.g. a+1, a+2, ... or
+    b-1, b-2, ...). Each frame starts from a constant-velocity prediction from the two previous poses
+    (the first frame from first_guess {n: 4x4}, e.g. the spline pose) and is fitted with step_fit, linked
+    to the previous frame by the frame-to-frame term. key: {n: 4x4} at the keyframe; direction: +1 stepping
+    forward from it, -1 stepping backward. Returns {(n, f): 4x4}."""
+    hist = [(frames[0] - direction, key)]     # (frame, poses): the keyframe comes just before the first frame
+    out = {}
+    for i, f in enumerate(frames):
+        if i == 0:
+            init = first_guess
+        else:
+            M1, M2 = hist[-1][1], hist[-2][1]                     # constant velocity: M1 * (M2^-1 * M1)
+            init = {n: M1[n] @ np.linalg.inv(M2[n]) @ M1[n] for n in names}
+        fit = step_fit(trial, views, fovs, f2f, sdfs, names, f, init, pts, prev=hist[-1][1], prev_frame=hist[-1][0], **kw)
+        hist.append((f, fit))
+        for n in names: out[(n, f)] = fit[n]
+    return out
+
+
+def blend_poses(Mf, Mb, s, pivot):
+    """Pose between Mf (weight 1 - s) and Mb (weight s): pivot position linear, rotation geodesic."""
+    from scipy.spatial.transform import Rotation as Rot
+    Rf, Rb = Mf[:3, :3], Mb[:3, :3]
+    R = Rf @ Rot.from_rotvec(s * Rot.from_matrix(Rf.T @ Rb).as_rotvec()).as_matrix()
+    p = (1 - s) * (Rf @ pivot + Mf[:3, 3]) + s * (Rb @ pivot + Mb[:3, 3])
+    M = np.eye(4); M[:3, :3] = R; M[:3, 3] = p - R @ pivot
+    return M

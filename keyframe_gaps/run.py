@@ -5,7 +5,9 @@
     python keyframe_gaps/run.py run      --arm new_opt --spacing 20 [--task 0 --ntasks 1] [--quick]
     python keyframe_gaps/run.py assemble [--arm new_opt] [--spacing 20]
 
-Units: new_opt -> (trial, spacing, gap), all bones co-fitted; keyframe_interp -> (trial, spacing).
+Units: new_opt, new_opt_stepwise -> (trial, spacing, gap), all bones co-fitted; keyframe_interp -> (trial, spacing).
+new_opt_stepwise also writes its chains-only path (before refinement) as the pseudo-arm new_opt_stepwise_chains
+at `assemble`.
 `run` processes units[task::ntasks] and skips units already written, so jobs can be resubmitted.
 Outputs ($BVR_RESULTS, default <repo>/results/keyframe_gaps), one folder per arm and spacing:
     <arm>/s<spacing>/units/<trial>_<a>-<b>.json      poses, settings, timings
@@ -29,7 +31,7 @@ import torch  # noqa: E402
 from src.device import DEVICE  # noqa: E402
 from src.io import Trial  # noqa: E402
 from src.pipeline import anchored_setup, f2f_for, ref_keys, spline_track  # noqa: E402
-from src.tracking import AnchoredFit  # noqa: E402
+from src.tracking import AnchoredFit, blend_poses, chain  # noqa: E402
 
 CFG = yaml.safe_load(open(os.path.join(ROOT, 'keyframe_gaps', 'config.yaml')))
 RESULTS = os.environ.get('BVR_RESULTS', os.path.join(ROOT, 'results', 'keyframe_gaps'))
@@ -97,16 +99,18 @@ def run_interp(u, c):
     return {n: {f: tr[n][f].tolist() for f in range(keys[0] + 1, keys[-1]) if f not in keys} for n in BONES}, {}
 
 
-def run_anchored(u, c):
-    """Anchored fit of one gap, all bones co-fitted, base path = spline through all keyframes of the trial."""
+def run_anchored(u, c, base=None, f2f=None):
+    """Anchored fit of one gap, all bones co-fitted. Base path: the spline through all keyframes of the trial,
+    or `base` {bone: (n_frames, 4, 4)} when given (the stepwise arm)."""
     T = trial(u['trial']); keys = keyframes(T.n_frames, u['spacing'])
     fovs, views, sdfs = anchored_setup(T, BONES)
-    base = spline_track(T, ref_keys(T, keys, BONES))
+    if base is None:
+        base = spline_track(T, ref_keys(T, keys, BONES))
     a, b = u['a'], u['b']; frames = list(range(a, b + 1)); gap = b - a
     K = max(1, math.ceil(c['K_per_10'] * gap / 10))
     batch = max(1, min(gap - 1, math.ceil(c['batch_per_10'] * gap / 10)))
     iters = [QUICK['iters']] * len(c['iters']) if QUICK else c['iters']
-    fit = AnchoredFit(T, views, fovs, f2f_for(T, fovs, base, frames, BONES), sdfs, BONES, [a, b],
+    fit = AnchoredFit(T, views, fovs, f2f or f2f_for(T, fovs, base, frames, BONES), sdfs, BONES, [a, b],
                       {(n, f): base[n][f] for n in BONES for f in frames}, cofit=c['cofit'], K=K,
                       w_drr=c['w_drr'], w_f2f=c['w_f2f'], lam=c['lam'], mu=c['mu'], d_min=c['d_min'],
                       res=c['res'], iters=iters, lrs=c['lrs'], batch=batch, seed=a, log=log)
@@ -116,9 +120,42 @@ def run_anchored(u, c):
     return poses, dict(K=K, batch=batch, gap=gap, iters=iters, **info)
 
 
+def run_stepwise(u, c):
+    """Forward chain from keyframe a and backward chain from keyframe b, blended by distance (weight on the
+    backward chain = (f - a) / (b - a)), then the anchored refinement starting from the blended path."""
+    T = trial(u['trial']); keys = keyframes(T.n_frames, u['spacing'])
+    fovs, views, sdfs = anchored_setup(T, BONES)
+    spline = spline_track(T, ref_keys(T, keys, BONES))
+    a, b = u['a'], u['b']; inner = list(range(a + 1, b))
+    f2f = f2f_for(T, fovs, spline, list(range(a, b + 1)), BONES, margin=300)   # wide: the true path may be far from the spline
+    pts = {n: torch.tensor(T.bones[n].surface_points(2500, 0.6, seed=0)) for n in BONES}
+    step_iters = [QUICK['iters']] * len(c['step_iters']) if QUICK else c['step_iters']
+    kw = dict(w_drr=c['w_drr'], w_f2f=c['w_f2f'], mu=c['mu'], d_min=c['d_min'], res=c['step_res'],
+              iters=step_iters, lrs=c['step_lrs'])
+    t0 = time.time()
+    fwd = chain(T, views, fovs, f2f, sdfs, BONES, {n: T.ref[n][a] for n in BONES}, inner, +1,
+                {n: spline[n][a + 1] for n in BONES}, pts, **kw)
+    bwd = chain(T, views, fovs, f2f, sdfs, BONES, {n: T.ref[n][b] for n in BONES}, inner[::-1], -1,
+                {n: spline[n][b - 1] for n in BONES}, pts, **kw)
+    t_chain = time.time() - t0
+    base = {n: spline[n].copy() for n in BONES}; blend, disagree = {n: {} for n in BONES}, {n: {} for n in BONES}
+    for n in BONES:
+        piv = T.bones[n].pivot
+        for f in inner:
+            Mf, Mb = fwd[(n, f)], bwd[(n, f)]
+            base[n][f] = blend_poses(Mf, Mb, (f - a) / (b - a), piv); blend[n][f] = base[n][f].tolist()
+            dR = np.degrees(np.arccos(np.clip((np.trace(Mf[:3, :3].T @ Mb[:3, :3]) - 1) / 2, -1, 1)))
+            disagree[n][f] = [float(np.linalg.norm((Mf[:3, :3] - Mb[:3, :3]) @ piv + Mf[:3, 3] - Mb[:3, 3])), float(dR)]
+    log(f'    chains {a}-{b}: {t_chain:.0f}s, max disagreement '
+        f'{max(v[0] for d in disagree.values() for v in d.values()):.2f} mm')
+    poses, meta = run_anchored(u, c, base=base, f2f=f2f)
+    meta.update(chain_sec=t_chain, step_iters=step_iters, blend=blend, chain_disagreement=disagree)
+    return poses, meta
+
+
 def run_unit(u):
     c = CFG['arms'][u['arm']]; t0 = time.time()
-    poses, meta = (run_interp if c['kind'] == 'interp' else run_anchored)(u, c)
+    poses, meta = {'interp': run_interp, 'anchored': run_anchored, 'stepwise': run_stepwise}[c['kind']](u, c)
     return dict(unit=u, config=c, poses={n: {str(f): M for f, M in p.items()} for n, p in poses.items()},
                 meta=meta, sec=time.time() - t0, host=socket.gethostname(), device=str(DEVICE),
                 torch=torch.__version__, gpu=torch.cuda.get_device_name() if DEVICE.type == 'cuda' else None,
@@ -157,11 +194,20 @@ def cmd_assemble(args):
                 done = [u for u in us if os.path.exists(unit_path(u))]
                 if not done:
                     continue
+                bl = {n: tr[n].copy() for n in BONES}; has_blend = False
                 for u in done:
-                    for n, d in json.load(open(unit_path(u)))['poses'].items():
-                        for f, M in d.items(): tr[n][int(f)] = np.array(M)
+                    d = json.load(open(unit_path(u)))
+                    for n, p in d['poses'].items():
+                        for f, M in p.items(): tr[n][int(f)] = np.array(M)
+                    if 'blend' in d['meta']:                  # stepwise arm: also keep the chains-only path
+                        has_blend = True
+                        for n, p in d['meta']['blend'].items():
+                            for f, M in p.items(): bl[n][int(f)] = np.array(M)
                 path = os.path.join(arm_dir(arm, s), 'tracks', f'{tn}.npz'); os.makedirs(os.path.dirname(path), exist_ok=True)
                 np.savez(path, **tr)
+                if has_blend:
+                    path = os.path.join(arm_dir(arm + '_chains', s), 'tracks', f'{tn}.npz')
+                    os.makedirs(os.path.dirname(path), exist_ok=True); np.savez(path, **bl)
                 log(f'{arm} s{s} {tn}: {len(done)}/{len(us)} units' + (' (INCOMPLETE)' if len(done) < len(us) else ''))
 
 

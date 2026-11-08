@@ -21,5 +21,12 @@ arms:
   # frame gets the same flexibility and the same amount of image data whatever the spacing.
   new_opt:          {kind: anchored, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
                      K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1]}
+  # new_opt with a stepwise start: from each keyframe, step frame by frame into the gap (each frame starts
+  # from a constant-velocity prediction and is fitted alone, linked to the previous frame by the
+  # frame-to-frame term); the forward and backward chains are blended by distance, and the result replaces
+  # the spline as the starting path for the same anchored refinement as new_opt.
+  new_opt_stepwise: {kind: stepwise, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
+                     K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1],
+                     step_res: [256, 512], step_iters: [20, 20], step_lrs: [0.2, 0.05]}
   # Reference: spline interpolation through the same keyframes (CPU, seconds)
   keyframe_interp:  {kind: interp, interp: spline}
