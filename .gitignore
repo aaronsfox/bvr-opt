@@ -3,3 +3,4 @@ results/*/logs/
 mc-smoke-*.out
 mc-score-*.out
 mc-setup-*.out
+kg-score-*.out

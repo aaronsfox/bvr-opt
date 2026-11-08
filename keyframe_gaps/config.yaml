@@ -1,0 +1,25 @@
+# Keyframe gaps (Analysis 3 in the plan doc): perfect (bead-based reference) keyframes at increasing spacing.
+#
+# Every condition shares the same bookend keyframes, `bookend` frames in from each end of the trial
+# (frame 5 and frame N - 6). Between them, keyframes fall every `spacing` frames from the first bookend.
+# If the last regular keyframe would leave a final gap shorter than half the spacing, it is dropped so that
+# gap merges with the one before. `full` uses the two bookends only (one gap over the whole trial).
+# Scored frames: every non-keyframe strictly between the bookends.
+
+data_root: datasets/Welte2022/data/SOL001A
+trials: [T0014_hop108_0001, T0014_hop108_0002, T0019_jog0001, T000AssessmentTrial]
+bones: [tib, tal, cal]
+bookend: 5
+spacings: [5, 10, 20, 30, 40, full]
+
+# Welte 2022 operator standard: frames worse than this would need correcting by hand
+correction_threshold: {pivot_mm: 1.0, rot_deg: 2.0}
+
+arms:
+  # The new method, with the methods-comparison settings. The basis size K and the frames sampled per
+  # iteration scale with gap length (per 10 frames: K = 3, batch = 4, as in the methods comparison), so each
+  # frame gets the same flexibility and the same amount of image data whatever the spacing.
+  new_opt:          {kind: anchored, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
+                     K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1]}
+  # Reference: spline interpolation through the same keyframes (CPU, seconds)
+  keyframe_interp:  {kind: interp, interp: spline}

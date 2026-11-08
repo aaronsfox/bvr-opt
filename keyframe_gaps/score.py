@@ -1,0 +1,188 @@
+"""Score every assembled keyframe-gaps track against the bead-based reference, frame by frame.
+
+    python keyframe_gaps/score.py          # after `run.py assemble`
+
+Scored frames: non-keyframes strictly between the bookends. Per bone: pivot error (mm), helical rotation
+(deg), helical translation (mm); per joint (tib-tal, tal-cal): relative rotation/translation error and
+minimum surface separation (PV signed distance field). Each scored frame also carries the length of its
+gap and its distance to the nearest keyframe. A frame "needs correction" when pivot error > 1 mm or
+helical rotation > 2 deg (Welte 2022 operator standard). Results are unfiltered.
+
+Two frame sets are summarised: all scored frames of each spacing (primary) and the frames that are not a
+keyframe at any spacing (common set, so every spacing is scored on identical frames).
+
+Writes $BVR_RESULTS/scores.csv, compute.csv, summary.md and figures/.
+"""
+import glob
+import json
+import os
+import sys
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+import torch  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from run import CFG, RESULTS, arm_dir, keyframes, trial  # noqa: E402
+from src import collision  # noqa: E402
+from src.geometry import helical_error, pivot_error  # noqa: E402
+
+BONES = CFG['bones']; JOINTS = [('tib', 'tal'), ('tal', 'cal')]
+NAME = {'tib': 'Tibia', 'tal': 'Talus', 'cal': 'Calcaneus'}
+TH = CFG['correction_threshold']
+SP = [str(s) for s in CFG['spacings']]
+
+
+def needs_correction(d):
+    return (d.pivot_mm > TH['pivot_mm']) | (d.rot_deg > TH['rot_deg'])
+
+
+def common_frames(tn):
+    N = trial(tn).n_frames; keys = set().union(*[keyframes(N, s) for s in SP])
+    return {f for f in range(CFG['bookend'] + 1, N - 1 - CFG['bookend']) if f not in keys}
+
+
+def score_track(arm, s, tn, tr, sdfs):
+    T = trial(tn); keys = keyframes(T.n_frames, s); common = common_frames(tn)
+    rows = []
+    for a, b in zip(keys[:-1], keys[1:]):
+        for f in range(a + 1, b):
+            info = dict(arm=arm, spacing=s, trial=tn, frame=f, gap=b - a, to_key=min(f - a, b - f), common=f in common)
+            for n in BONES:
+                M, G = tr[n][f], T.ref[n][f]
+                if not np.isfinite(M).all():
+                    continue
+                rot, hel = helical_error(M, G)
+                rows.append(dict(info, item=n, rot_deg=rot, hel_mm=hel, pivot_mm=pivot_error(M, G, T.bones[n].pivot)))
+            for p, d in JOINTS:
+                if not (np.isfinite(tr[p][f]).all() and np.isfinite(tr[d][f]).all()):
+                    continue
+                rel = np.linalg.inv(tr[p][f]) @ tr[d][f]; relg = np.linalg.inv(T.ref[p][f]) @ T.ref[d][f]
+                rot, hel = helical_error(rel, relg)
+                P = {k: (torch.tensor(tr[k][f][:3, :3]), torch.tensor(tr[k][f][:3, 3])) for k in (p, d)}
+                rows.append(dict(info, item=f'{p}-{d}', rot_deg=rot, hel_mm=hel,
+                                 pivot_mm=pivot_error(rel, relg, T.bones[d].pivot), sep_mm=collision.min_separation(sdfs, P, p, d)))
+    return rows
+
+
+def q95(x):
+    return np.nanpercentile(x, 95) if len(x) else np.nan
+
+
+def table(df, title, note):
+    out = [f'## {title}', '', note, '',
+           '| Arm | Spacing | Bone-frames | ' + ' | '.join(f'{NAME[n]} pivot mm | {NAME[n]} rot °' for n in BONES) +
+           ' | Max pivot mm | Tal–cal rot ° | Needs correction % |', '|' + '---|' * (3 + 2 * len(BONES) + 3)]
+    for arm in CFG['arms']:
+        for s in SP:
+            d = df[(df.arm == arm) & (df.spacing == s)]
+            if d.empty:
+                continue
+            b = d[d.item.isin(BONES)]; cells = []
+            for n in BONES:
+                x = d[d.item == n]
+                cells += [f'{x.pivot_mm.median():.2f} [{q95(x.pivot_mm):.2f}]', f'{x.rot_deg.median():.2f} [{q95(x.rot_deg):.2f}]']
+            j = d[d.item == 'tal-cal']
+            out.append(f'| {arm} | {s} | {len(b)} | ' + ' | '.join(cells) + f' | {b.pivot_mm.max():.2f} | '
+                       f'{j.rot_deg.median():.2f} [{q95(j.rot_deg):.2f}] | {100 * needs_correction(b).mean():.1f} |')
+    return out + ['']
+
+
+def by_trial(df):
+    out = ['## Frames needing correction by trial (% of bone-frames; gap lengths used in brackets)', '',
+           '| Arm | Spacing | ' + ' | '.join(CFG['trials']) + ' |', '|' + '---|' * (2 + len(CFG['trials']))]
+    for arm in CFG['arms']:
+        for s in SP:
+            d = df[(df.arm == arm) & (df.spacing == s) & df.item.isin(BONES)]
+            if d.empty:
+                continue
+            c = []
+            for tn in CFG['trials']:
+                x = d[d.trial == tn]
+                gaps = sorted(set(np.diff(keyframes(trial(tn).n_frames, s))))
+                c.append(f'{100 * needs_correction(x).mean():.1f} ({",".join(map(str, gaps))})' if len(x) else '–')
+            out.append(f'| {arm} | {s} | ' + ' | '.join(c) + ' |')
+    return out + ['']
+
+
+def by_distance(df):
+    """Median pivot error by distance to the nearest keyframe (bones pooled)."""
+    b = df[df.item.isin(BONES)].copy()
+    b['to_key_bin'] = pd.cut(b.to_key, [0, 2, 5, 10, 15, 20, 100], labels=['1–2', '3–5', '6–10', '11–15', '16–20', '>20'])
+    t = b.pivot_table(index=['arm', 'spacing'], columns='to_key_bin', values='pivot_mm', aggfunc='median', observed=False)
+    out = ['## Median pivot error (mm) by distance to the nearest keyframe (frames)', '',
+           '| Arm | Spacing | ' + ' | '.join(map(str, t.columns)) + ' |', '|' + '---|' * (2 + len(t.columns))]
+    for arm in CFG['arms']:
+        for s in SP:
+            if (arm, s) in t.index:
+                out.append(f'| {arm} | {s} | ' + ' | '.join('–' if np.isnan(v) else f'{v:.2f}' for v in t.loc[(arm, s)]) + ' |')
+    return out + ['']
+
+
+def compute(arms):
+    rows = []
+    for arm in arms:
+        for s in SP:
+            for p in glob.glob(os.path.join(arm_dir(arm, s), 'units', '*.json')):
+                d = json.load(open(p)); n_bf = sum(len(v) for v in d['poses'].values())
+                m = d['meta']
+                renders = sum(m['iters']) * m['batch'] / (m['gap'] - 1) if 'gap' in m else 0.0
+                rows.append(dict(arm=arm, spacing=s, bone_frames=n_bf, renders=renders, sec=d['sec'],
+                                 device=d.get('gpu') or d.get('device'), workers=d.get('workers', 1)))
+    if not rows:
+        return [], None
+    c = pd.DataFrame(rows)
+    out = ['## Compute', '', 'Renders per bone-frame: DRR renders of one bone (both views, with gradients) per scored '
+           'bone-frame. Wall time on the recorded device, with `workers` processes sharing it.', '',
+           '| Arm | Spacing | Bone-frames | Renders per bone-frame | Wall time per bone-frame (s) | Device-hours | Device | Workers |',
+           '|---|---|---|---|---|---|---|---|']
+    for (arm, s), g in c.groupby(['arm', 'spacing'], sort=False):
+        out.append(f'| {arm} | {s} | {g.bone_frames.sum()} | {(g.renders * g.bone_frames).sum() / g.bone_frames.sum():.0f} | '
+                   f'{g.sec.sum() / g.bone_frames.sum():.2f} | {g.sec.sum() / 3600:.2f} | {g.device.iloc[0]} | {int(g.workers.max())} |')
+    return out + [''], c
+
+
+def figure(df, path):
+    arms = [a for a in CFG['arms'] if (df.arm == a).any()]
+    fig, ax = plt.subplots(1, 3, figsize=(16, 4.6))
+    x = np.arange(len(SP))
+    for i, arm in enumerate(arms):
+        for j, n in enumerate(BONES):
+            d = df[(df.arm == arm) & (df.item == n)]
+            med = [d[d.spacing == s].pivot_mm.median() for s in SP]; p95 = [q95(d[d.spacing == s].pivot_mm) for s in SP]
+            ax[j].plot(x, med, 'o-', color=f'C{i}', label=f'{arm} median' if j == 0 else None)
+            ax[j].plot(x, p95, 's--', color=f'C{i}', alpha=.6, label=f'{arm} 95th pct' if j == 0 else None)
+    for j, n in enumerate(BONES):
+        ax[j].axhline(TH['pivot_mm'], color='0.6', ls=':', lw=1); ax[j].set_xticks(x, SP)
+        ax[j].set_title(NAME[n]); ax[j].set_xlabel('Keyframe spacing (frames)'); ax[j].set_yscale('log')
+    ax[0].set_ylabel('Pivot error (mm)')
+    fig.legend(loc='lower center', ncol=4, frameon=False)
+    fig.suptitle('Keyframe gaps: error against the bead-based reference, perfect keyframes (dotted: 1 mm)')
+    plt.tight_layout(rect=(0, 0.08, 1, 0.95)); plt.savefig(path, dpi=110)
+
+
+def main():
+    sdfs = {tn: {n: collision.SDF(trial(tn).bones[n]) for n in BONES} for tn in CFG['trials']}
+    rows = []
+    for arm in CFG['arms']:
+        for s in SP:
+            for p in sorted(glob.glob(os.path.join(arm_dir(arm, s), 'tracks', '*.npz'))):
+                tn = os.path.basename(p)[:-4]; rows += score_track(arm, s, tn, dict(np.load(p)), sdfs[tn])
+    df = pd.DataFrame(rows); df.to_csv(os.path.join(RESULTS, 'scores.csv'), index=False)
+    comp, cdf = compute(list(CFG['arms']))
+    if cdf is not None: cdf.to_csv(os.path.join(RESULTS, 'compute.csv'), index=False)
+    lines = ['# Keyframe gaps results', '',
+             'Perfect keyframes; bookends at frame 5 and N − 6. Median [95th percentile], unfiltered, pooled over trials.', '']
+    lines += table(df, 'All scored frames per spacing (primary)', 'Every non-keyframe between the bookends, for each spacing.')
+    lines += table(df[df.common], 'Common frame set', 'Frames that are not a keyframe at any spacing, so every spacing is scored on identical frames.')
+    lines += by_trial(df) + by_distance(df) + comp
+    s = '\n'.join(lines) + '\n'; open(os.path.join(RESULTS, 'summary.md'), 'w').write(s); print(s)
+    os.makedirs(os.path.join(RESULTS, 'figures'), exist_ok=True)
+    figure(df, os.path.join(RESULTS, 'figures', 'error_by_spacing.png'))
+
+
+if __name__ == '__main__':
+    main()
