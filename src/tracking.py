@@ -314,3 +314,82 @@ def blend_poses(Mf, Mb, s, pivot):
     p = (1 - s) * (Rf @ pivot + Mf[:3, 3]) + s * (Rb @ pivot + Mb[:3, 3])
     M = np.eye(4); M[:3, :3] = R; M[:3, 3] = p - R @ pivot
     return M
+
+
+# ------------------------------------------------------------------------------------------- keyframe correction
+class KeyframeFit:
+    """Correct one rater keyframe k using the images of frames k - window .. k + window.
+
+    Each bone's pose over the window is pose(f) = base(f) * Delta(f), with s = (f - k) / window and
+        Delta(f) = delta + s * v + s^2 * w
+    where delta is the correction of the keyframe itself, kept inside a ball of tol = (mm, deg) by a smooth
+    norm cap (plus a weak quadratic prior), and v, w (unbounded) let the neighbouring frames follow their
+    own path. Bones are co-fitted; objective = DRR term over the window + frame-to-frame term between
+    consecutive window frames + contact + priors. Only the corrected keyframe pose is kept.
+    base: {(n, f): 4x4} for every window frame (e.g. the spline through the rater's keyframes)."""
+
+    def __init__(self, trial, views, fovs, f2f, sdfs, names, k, frames, base, tol=(1.0, 2.0), w_drr=1.0,
+                 w_f2f=2.0, mu=0.0, d_min=0.0, key_w=0.01, lam=0.003, res=(256, 512), iters=(40, 50),
+                 lrs=(0.3, 0.1), log=print):
+        self.T, self.views, self.fovs, self.f2f, self.sdfs = trial, views, fovs, f2f, sdfs
+        self.names, self.k, self.frames = list(names), k, list(frames)
+        self.half = max(max(abs(f - k) for f in self.frames), 1)
+        self.tol = (float(tol[0]), float(tol[1]))
+        self.w = dict(drr=w_drr, f2f=w_f2f, mu=mu, key=key_w, lam=lam); self.d_min = d_min
+        self.sched = list(zip(res, iters, lrs)); self.log = log
+        self.base = {(n, f): Pose.from_matrix(base[(n, f)], trial.bones[n].pivot) for n in names for f in self.frames}
+        self.U = {n: torch.zeros(2, 3, dtype=torch.float64, requires_grad=True) for n in names}
+        self.V = {n: torch.zeros(2, 6, dtype=torch.float64, requires_grad=True) for n in names}
+        self.pts = {n: torch.tensor(trial.bones[n].surface_points(2500, 0.6, seed=0)) for n in names}
+
+    def params(self):
+        return list(self.U.values()) + list(self.V.values())
+
+    def delta_key(self, n):
+        u = self.U[n]
+        return torch.cat([_capped(u[0], self.tol[0]), _capped(u[1], self.tol[1])])
+
+    def pose(self, n, f):
+        s = (f - self.k) / self.half
+        d = self.delta_key(n) + s * self.V[n][0] + s * s * self.V[n][1]
+        return self.base[(n, f)].apply(d)
+
+    def step(self, res):
+        L = self.w['lam'] * sum((v ** 2).sum() for v in self.V.values())
+        L = L + self.w['key'] * sum(((self.delta_key(n)[:3] / self.tol[0]) ** 2).sum() +
+                                    ((self.delta_key(n)[3:] / self.tol[1]) ** 2).sum() for n in self.names)
+        L.backward(); total = float(L.detach())
+        nf = len(self.frames)
+        if self.w['drr'] > 0:                                 # one frame's render graph at a time (memory)
+            for f in self.frames:
+                rads = [self.T.image(ci, f, res) for ci in range(len(self.T.cams))]
+                t_, c_ = drr_term(self.views[res], rads, self.fovs, self.T.bones, {n: self.pose(n, f) for n in self.names})
+                if torch.is_tensor(t_):
+                    t_ = self.w['drr'] * t_ / max(c_, 1) / nf; t_.backward(); total += float(t_.detach())
+        if self.w['f2f'] > 0 and nf > 1:
+            tot, cnt = 0, 0
+            for n in self.names:
+                W = {f: self.pts[n] @ self.pose(n, f)[0].T + self.pose(n, f)[1] for f in self.frames}
+                for f in self.frames[:-1]:
+                    t_, c_ = self.f2f.pair(W[f], W[f + 1], f); tot, cnt = tot + t_, cnt + c_
+            if torch.is_tensor(tot):
+                t_ = self.w['f2f'] * tot / max(cnt, 1); t_.backward(); total += float(t_.detach())
+        if self.w['mu'] > 0 and len(self.names) > 1:
+            t_ = self.w['mu'] * sum(collision.penalty(self.sdfs, {n: self.pose(n, f) for n in self.names}, self.d_min)
+                                    for f in self.frames) / nf
+            t_.backward(); total += float(t_.detach())
+        return total
+
+    def run(self):
+        t0 = time.time()
+        for res, it, lr in self.sched:
+            opt = torch.optim.Adam(self.params(), lr=lr); sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, it)
+            for _ in range(it):
+                opt.zero_grad(); L = self.step(res); opt.step(); sch.step()
+        out = {}
+        with torch.no_grad():
+            for n in self.names:
+                R, t = self.pose(n, self.k); M = np.eye(4); M[:3, :3] = to_np(R); M[:3, 3] = to_np(t); out[n] = M
+            moved = {n: to_np(self.delta_key(n)).tolist() for n in self.names}
+        self.log(f'    keyframe {self.k} (frames {self.frames[0]}-{self.frames[-1]}): loss {L:.4f}, {time.time() - t0:.0f}s')
+        return out, dict(delta=moved, sec=time.time() - t0)

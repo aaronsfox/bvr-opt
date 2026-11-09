@@ -29,9 +29,14 @@ bead-based reference poses (a perfect rater), so the only thing that changes is 
 |---|---|---|
 | **new_opt** | The methods-comparison method: keyframe-anchored gap fit, bones co-fitted, signed gradient correlation + frame-to-frame + collision (PV, d_min −2 mm), hard anchors. The basis size and frames sampled per iteration scale with gap length (per 10 frames: K = 3, batch = 4), so every frame gets the same flexibility and image data whatever the spacing; iterations are fixed (40 + 50) | one per gap: 36 / 18 / 9 / 6 / 5 / 4 for spacings 5 / 10 / 20 / 30 / 40 / full |
 | **new_opt_stepwise** | new_opt with a stepwise start. From each keyframe, step frame by frame into the gap: each frame starts from a constant-velocity prediction from the two previous poses and is fitted alone (bones co-fitted, DRR + frame-to-frame link to the previous frame + collision; 20 + 20 iterations at 256 and 512). The forward and backward chains are blended by distance to each keyframe, and the blend replaces the spline as the starting path for the same anchored refinement as new_opt. The chains-only result is also scored, as `new_opt_stepwise_chains` | one per gap, as new_opt |
+| **new_opt_stepwise_kc** | Keyframe correction, then new_opt_stepwise. Each given keyframe *k* is first re-fitted to the images of frames *k* − `window` … *k* + `window` (bones co-fitted, DRR + frame-to-frame + collision), moving at most `tol` (mm, °) from where it was given; the neighbouring frames follow a smooth path of their own and are discarded. The corrected keyframes then replace the given ones, held fixed, in the stepwise chains and the anchored refinement. Defaults: `tol` = 1 mm, 2° (Welte operator standard), `window` = 2 | keyframe stage: one per trial; then one per gap |
 | keyframe_interp | Reference: spline interpolation through the same keyframes (CPU, seconds) | one per trial |
 
 Other methods (e.g. pso_simplex) can be added as arms in `config.yaml`.
+
+The keyframes each arm receives are set by `keyframes:` in `config.yaml` (`reference` = the bead-based poses,
+a perfect rater). With perfect keyframes, `new_opt_stepwise_kc` measures the cost of keyframe correction:
+how far it moves keyframes that are already right. Simulated raters (Analysis 2) will plug in here.
 
 Why the stepwise arm: new_opt reliably corrects starting poses within about 2 mm of the truth and rarely
 recovers from more than about 4 mm. At spacings of 20 frames or more the spline start is often further
@@ -47,6 +52,7 @@ From the repo root (uses the `bvr_opt_gpu` env from the methods comparison):
 git pull origin main
 bash keyframe_gaps/slurm/submit_all.sh new_opt            # six small job arrays, one per spacing
 bash keyframe_gaps/slurm/submit_all.sh new_opt_stepwise   # the same for the stepwise arm
+bash keyframe_gaps/slurm/submit_all.sh new_opt_stepwise_kc   # keyframe correction (its own job), then the gaps
 # or one spacing at a time:  bash keyframe_gaps/slurm/submit.sh new_opt 20
 
 squeue -u $USER
@@ -65,7 +71,8 @@ results/keyframe_gaps/
   new_opt/s5/ ... new_opt/sfull/      units/<trial>_<a>-<b>.json, tracks/<trial>.npz
   new_opt_stepwise/s*/                as new_opt (units also hold the chains and their disagreement)
   new_opt_stepwise_chains/s*/tracks/  chains-only path, written by `assemble`
+  new_opt_stepwise_kc/s*/keyframes/   corrected keyframes per trial (with how far each moved)
   keyframe_interp/s5/ ...
-  scores.csv  compute.csv  summary.md  figures/error_by_spacing.png
+  scores.csv  compute.csv  keyframes.csv  summary.md  figures/error_by_spacing.png
   logs/                               (not committed)
 ```

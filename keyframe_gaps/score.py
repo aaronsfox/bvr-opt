@@ -11,7 +11,9 @@ helical rotation > 2 deg (Welte 2022 operator standard). Results are unfiltered.
 Two frame sets are summarised: all scored frames of each spacing (primary) and the frames that are not a
 keyframe at any spacing (common set, so every spacing is scored on identical frames).
 
-Writes $BVR_RESULTS/scores.csv, compute.csv, summary.md and figures/.
+Arms with keyframe correction also get a table of their corrected keyframes' error (keyframes.csv).
+
+Writes $BVR_RESULTS/scores.csv, compute.csv, keyframes.csv, summary.md and figures/.
 """
 import glob
 import json
@@ -124,6 +126,33 @@ def by_distance(df):
     return out + ['']
 
 
+def keyframe_table():
+    """Keyframe correction: error of the given and the corrected keyframes against the reference."""
+    rows = []
+    for arm, c in CFG['arms'].items():
+        if 'keyframe_correction' not in c:
+            continue
+        for s in SP:
+            for p in glob.glob(os.path.join(arm_dir(arm, s), 'keyframes', '*.json')):
+                d = json.load(open(p)); T = trial(d['unit']['trial'])
+                for n, kp in d['keyframes'].items():
+                    for k, M in kp.items():
+                        k = int(k); M = np.array(M); G = T.ref[n][k]
+                        rows.append(dict(arm=arm, spacing=s, trial=T.name, frame=k, item=n,
+                                         pivot_mm=pivot_error(M, G, T.bones[n].pivot), rot_deg=helical_error(M, G)[0]))
+    if not rows:
+        return [], None
+    k = pd.DataFrame(rows)
+    out = ['## Keyframe correction', '',
+           f"Error of the corrected keyframes against the reference (given keyframes: {CFG['keyframes']}). "
+           'Median [95th percentile] and maximum, bones pooled.', '',
+           '| Arm | Spacing | Keyframes | Pivot mm | Max pivot mm | Rotation ° | Max rotation ° |', '|---|---|---|---|---|---|---|']
+    for (arm, s), g in k.groupby(['arm', 'spacing'], sort=False):
+        out.append(f'| {arm} | {s} | {len(g)} | {g.pivot_mm.median():.2f} [{q95(g.pivot_mm):.2f}] | {g.pivot_mm.max():.2f} | '
+                   f'{g.rot_deg.median():.2f} [{q95(g.rot_deg):.2f}] | {g.rot_deg.max():.2f} |')
+    return out + [''], k
+
+
 def compute(arms):
     rows = []
     for arm in arms:
@@ -180,7 +209,9 @@ def main():
              'Perfect keyframes; bookends at frame 5 and N − 6. Median [95th percentile], unfiltered, pooled over trials.', '']
     lines += table(df, 'All scored frames per spacing (primary)', 'Every non-keyframe between the bookends, for each spacing.')
     lines += table(df[df.common], 'Common frame set', 'Frames that are not a keyframe at any spacing, so every spacing is scored on identical frames.')
-    lines += by_trial(df) + by_distance(df) + comp
+    kt, kdf = keyframe_table()
+    if kdf is not None: kdf.to_csv(os.path.join(RESULTS, 'keyframes.csv'), index=False)
+    lines += by_trial(df) + by_distance(df) + kt + comp
     s = '\n'.join(lines) + '\n'; open(os.path.join(RESULTS, 'summary.md'), 'w').write(s); print(s)
     os.makedirs(os.path.join(RESULTS, 'figures'), exist_ok=True)
     figure(df, os.path.join(RESULTS, 'figures', 'error_by_spacing.png'))

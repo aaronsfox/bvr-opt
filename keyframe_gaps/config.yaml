@@ -12,6 +12,10 @@ bones: [tib, tal, cal]
 bookend: 5
 spacings: [5, 10, 20, 30, 40, full]
 
+# Where keyframe poses come from: `reference` = the bead-based poses (a perfect rater). Analysis 2 will add
+# simulated raters.
+keyframes: reference
+
 # Welte 2022 operator standard: frames worse than this would need correcting by hand
 correction_threshold: {pivot_mm: 1.0, rot_deg: 2.0}
 
@@ -28,5 +32,14 @@ arms:
   new_opt_stepwise: {kind: stepwise, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
                      K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1],
                      step_res: [256, 512], step_iters: [20, 20], step_lrs: [0.2, 0.05]}
+  # new_opt_stepwise preceded by keyframe correction: each given keyframe k is first re-fitted to the images
+  # of frames k - window .. k + window (bones co-fitted, DRR + frame-to-frame + collision), moving at most
+  # `tol` (mm, deg) from where it was given. Only the corrected keyframes are kept; they then replace the
+  # given keyframes, held fixed, in the stepwise chains and the anchored refinement.
+  new_opt_stepwise_kc: {kind: stepwise, cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
+                        K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1],
+                        step_res: [256, 512], step_iters: [20, 20], step_lrs: [0.2, 0.05],
+                        keyframe_correction: {tol: [1.0, 2.0], window: 2, key_w: 0.01, res: [256, 512],
+                                              iters: [40, 50], lrs: [0.3, 0.1]}}
   # Reference: spline interpolation through the same keyframes (CPU, seconds)
   keyframe_interp:  {kind: interp, interp: spline}
