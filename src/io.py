@@ -27,8 +27,12 @@ def read_tra(path, order='column'):
 
 
 def write_tra(path, Ms, order='column'):
-    A = Ms.transpose(0, 2, 1) if order == 'column' else Ms
-    np.savetxt(path, A.reshape(len(A), 16), delimiter=',', fmt='%.6f')
+    """Write poses (n, 4, 4) as an Autoscoper .tra (one comma-separated 4x4 per line). Untracked frames are
+    written as `NaN`, the exact spelling Autoscoper writes and tests for when it reads a file."""
+    A = (Ms.transpose(0, 2, 1) if order == 'column' else Ms).reshape(len(Ms), 16)
+    with open(path, 'w') as fh:
+        for row in A:
+            fh.write(','.join('NaN' if np.isnan(v) else f'{v:.6f}' for v in row) + '\n')
 
 
 class Trial:

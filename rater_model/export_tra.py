@@ -65,7 +65,7 @@ tra/
 ```
 
 Bones: `cal` calcaneus, `tal` talus, `tib` tibia. Each file has one line per frame of the trial: the 4x4 pose,
-column-major as in Welte's reference files (translation in elements 13-15), on keyframes, and NaN on every
+column-major as in Welte's reference files (translation in elements 13-15), on keyframes, and `NaN` (Autoscoper's spelling) on every
 other frame. Load in Autoscoper with: Matrix, Orientation Column, Comma, mm, degrees, one bone at a time
 (Volume = Current).
 
