@@ -12,6 +12,7 @@ at `assemble`.
 Outputs ($BVR_RESULTS, default <repo>/results/keyframe_gaps), one folder per arm and spacing:
     <arm>/s<spacing>/units/<trial>_<a>-<b>.json      poses, settings, timings
     <arm>/s<spacing>/tracks/<trial>.npz               after `assemble`: {bone: (n_frames, 4, 4)}
+    <arm>/s<spacing>/tra/<trial>_<bone>.tra           the same tracks as Autoscoper .tra files
 """
 import argparse
 import json
@@ -29,7 +30,7 @@ sys.path.insert(0, ROOT)
 import torch  # noqa: E402
 
 from src.device import DEVICE  # noqa: E402
-from src.io import Trial  # noqa: E402
+from src.io import Trial, write_tra  # noqa: E402
 from src.pipeline import anchored_setup, f2f_for, ref_keys, spline_track  # noqa: E402
 from src.tracking import AnchoredFit, KeyframeFit, blend_poses, chain  # noqa: E402
 
@@ -273,10 +274,19 @@ def cmd_assemble(args):
                             for f, M in p.items(): bl[n][int(f)] = np.array(M)
                 path = os.path.join(arm_dir(arm, s), 'tracks', f'{tn}.npz'); os.makedirs(os.path.dirname(path), exist_ok=True)
                 np.savez(path, **tr)
+                write_tra_set(os.path.join(arm_dir(arm, s), 'tra'), tn, tr)
                 if has_blend:
                     path = os.path.join(arm_dir(arm + '_chains', s), 'tracks', f'{tn}.npz')
                     os.makedirs(os.path.dirname(path), exist_ok=True); np.savez(path, **bl)
                 log(f'{arm} s{s} {tn}: {len(done)}/{len(us)} units' + (' (INCOMPLETE)' if len(done) < len(us) else ''))
+
+
+def write_tra_set(folder, tn, tr):
+    """The same track as Autoscoper .tra files, one per bone (<trial>_<bone>.tra, column-major as Welte's
+    reference files, NaN on frames without a pose, i.e. outside the bookends)."""
+    os.makedirs(folder, exist_ok=True)
+    for n in BONES:
+        write_tra(os.path.join(folder, f'{tn}_{n}.tra'), tr[n])
 
 
 def main():
