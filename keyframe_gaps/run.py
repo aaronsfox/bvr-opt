@@ -291,11 +291,14 @@ def main():
     ap.add_argument('--max-units', type=int, default=0)
     ap.add_argument('--quick', action='store_true', help='smoke test: 2 iterations per stage; nothing is saved')
     ap.add_argument('--keyframes', default=None, help="keyframe source: 'reference' or 'rater:L<level>/r<id>'")
-    ap.add_argument('--kc-tol', default=None, help='keyframe-correction tolerance mm,deg (overrides config)')
+    ap.add_argument('--kc-tol', default=None, help='keyframe-correction tolerance mm:deg or mm,deg (overrides config)')
     args = ap.parse_args()
     torch.set_num_threads(int(os.environ.get('THREADS', os.environ.get('SLURM_CPUS_PER_TASK', '2'))))
     if args.keyframes: SOURCE['keyframes'] = args.keyframes
-    if args.kc_tol: SOURCE['kc_tol'] = [float(x) for x in args.kc_tol.split(',')]
+    if args.kc_tol:
+        SOURCE['kc_tol'] = [float(x) for x in args.kc_tol.replace(':', ',').split(',')]
+        if len(SOURCE['kc_tol']) != 2:
+            raise SystemExit(f'--kc-tol needs two values (mm and deg), got {args.kc_tol!r}')
     if args.cmd == 'has-kc':
         print('yes' if 'keyframe_correction' in CFG['arms'][args.arm] else 'no'); return
     if args.cmd == 'keys':

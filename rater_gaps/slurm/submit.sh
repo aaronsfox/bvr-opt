@@ -11,7 +11,8 @@ LEVEL=$1; SPACING=$2; RATERS=${3:-0-9}; TIME=${4:-04:00:00}; MAXC=${5:-}
 cd "$(dirname "$0")/../.."
 mkdir -p results/rater_gaps/logs
 ARM=$(python -c "import yaml; print(yaml.safe_load(open('rater_gaps/config.yaml'))['arm'])")
-TOL=$(python -c "import yaml; t=yaml.safe_load(open('rater_gaps/config.yaml'))['kc_tol'][$LEVEL]; print(f'{t[0]},{t[1]}')")
+# mm:deg with a colon: sbatch --export splits its value on commas
+TOL=$(python -c "import yaml; t=yaml.safe_load(open('rater_gaps/config.yaml'))['kc_tol'][$LEVEL]; print(f'{t[0]}:{t[1]}')")
 ARR="$RATERS${MAXC:+%$MAXC}"
 RES=(--partition=dgx --gres=gpu:1 --cpus-per-task=16 --mem=64G --time="$TIME")
 EXP="ALL,ARM=$ARM,LEVEL=$LEVEL,SPACING=$SPACING,TOL=$TOL,WORKERS=4,BVR_DEVICE=cuda"
