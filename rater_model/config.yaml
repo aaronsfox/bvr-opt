@@ -1,0 +1,29 @@
+# Simulated raters, calibrated to Welte et al. (2022) Figures 4 and 5 (see src/raters.py for the model).
+
+welte_fig4: rater_model/welte2022/welte2022_fig4_rater_bias_summary.csv
+welte_fig5: rater_model/welte2022/welte2022_fig5_new_operator2_rotation_bias.csv
+bones: {cal: calcaneus, tal: talus, tib: tibia}
+assessment_frames: 41          # Welte's assessment trial (Figure 4 summarises its 41 frames per operator)
+
+# Fixed from Figure 5 (New Operator 2, rotation): share of error variance in the constant per-rater offset.
+# Calcaneus and tibia ~75 %, talus none.
+offset_share: {cal: 0.75, tal: 0.0, tib: 0.75}
+# Translation has no per-frame data: its offset share is fitted per bone to Figure 4's translation range
+share_trans_grid: [0.0, 0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+
+# Fitted by calibrate.py (searched over these grids):
+#   phi      AR(1) coefficient of the frame-to-frame part, matched to Figure 5's lag-1 autocorrelation of
+#            the per-frame rotation error (pooled over bones; tibia before its occlusion episode)
+#   between  spread of rater quality (log-normal SD), matched to the spread of the three operators'
+#            medians in Figure 4 (coefficient of variation, pooled over bones, per quantity)
+#   scale    per bone and quantity, matched to the mean of the three operators' medians in Figure 4
+phi_grid: [0.0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+between_grid: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+n_sim_raters: 4000
+seed: 2022
+
+# Rater levels for the analyses: multiples of the fitted (trained, Welte-like) error
+levels: [1, 2, 4]
+n_raters: 10
+trials_root: datasets/Welte2022/data/SOL001A
+trials: [T0014_hop108_0001, T0014_hop108_0002, T0019_jog0001, T000AssessmentTrial]

@@ -1,0 +1,31 @@
+{
+ "phi": 0.7,
+ "between": {
+  "rotation_deg": 0.0,
+  "translation_mm": 0.0
+ },
+ "offset_share": {
+  "cal": 0.75,
+  "tal": 0.0,
+  "tib": 0.75
+ },
+ "offset_share_trans": {
+  "cal": 0.5,
+  "tal": 0.5,
+  "tib": 0.5
+ },
+ "scale": {
+  "cal": {
+   "rotation_deg": 0.4956183310430564,
+   "translation_mm": 0.1607765078262438
+  },
+  "tal": {
+   "rotation_deg": 0.2600920186792522,
+   "translation_mm": 0.46851483510298325
+  },
+  "tib": {
+   "rotation_deg": 0.5899173940291247,
+   "translation_mm": 0.5134475572515528
+  }
+ }
+}
