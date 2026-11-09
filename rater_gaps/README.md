@@ -44,9 +44,13 @@ Units per rater: keys stage 4 (one per trial); gaps 36 / 18 / 9 / 6 / 5 / 4 for 
 
 ```
 results/rater_gaps/
-  L<level>/r<id>/new_opt_stepwise_kc/s<spacing>/keyframes|units|tracks
+  L<level>/r<id>/new_opt_stepwise_kc/s<spacing>/keyframes|units|tracks|tra
   L<level>/r<id>/new_opt_stepwise_kc_chains/s<spacing>/tracks
-  L<level>/r<id>/keyframe_interp/s<spacing>/units|tracks
+  L<level>/r<id>/keyframe_interp/s<spacing>/units|tracks|tra
   scores.csv  keyframes.csv  summary.md  figures/raters_by_spacing.png
   logs/   (not committed)
 ```
+
+`tracks/<trial>.npz` holds {bone: (n_frames, 4, 4)}; `tra/<trial>_<bone>.tra` holds the same tracks as Autoscoper
+files (column-major like Welte's reference files, `NaN` outside the bookends). Load in Autoscoper with Matrix,
+Column, Comma, mm, degrees. The rater keyframes themselves are in `results/rater_model/tra/`.

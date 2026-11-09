@@ -68,7 +68,7 @@ and the error is in `results/keyframe_gaps/logs/<arm>_s<spacing>_<job>_<task>.lo
 
 ```
 results/keyframe_gaps/
-  new_opt/s5/ ... new_opt/sfull/      units/<trial>_<a>-<b>.json, tracks/<trial>.npz
+  new_opt/s5/ ... new_opt/sfull/      units/<trial>_<a>-<b>.json, tracks/<trial>.npz, tra/<trial>_<bone>.tra
   new_opt_stepwise/s*/                as new_opt (units also hold the chains and their disagreement)
   new_opt_stepwise_chains/s*/tracks/  chains-only path, written by `assemble`
   new_opt_stepwise_kc/s*/keyframes/   corrected keyframes per trial (with how far each moved)
