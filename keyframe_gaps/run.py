@@ -37,6 +37,9 @@ CFG = yaml.safe_load(open(os.path.join(ROOT, 'keyframe_gaps', 'config.yaml')))
 RESULTS = os.environ.get('BVR_RESULTS', os.path.join(ROOT, 'results', 'keyframe_gaps'))
 BONES = CFG['bones']
 QUICK = {}   # smoke-test overrides (never used for real runs)
+# Keyframe source and keyframe-correction tolerance: config defaults, overridable from the command line
+# (rater_gaps/ runs this script once per simulated rater: --keyframes rater:L2/r03 --kc-tol 3,3)
+SOURCE = {'keyframes': CFG['keyframes'], 'kc_tol': None}
 
 
 def log(*a):
@@ -99,10 +102,15 @@ def unit_path(u):
 
 
 def given_keyframes(T, keys):
-    """Keyframe poses as a rater would supply them: {bone: {frame: 4x4}}. Perfect rater for now."""
-    if CFG['keyframes'] == 'reference':
+    """Keyframe poses as a rater supplies them: {bone: {frame: 4x4}}. 'reference' = the bead-based poses
+    (a perfect rater); 'rater:L<level>/r<id>' = a simulated rater from results/rater_model/raters."""
+    src = SOURCE['keyframes']
+    if src == 'reference':
         return ref_keys(T, keys, BONES)
-    raise ValueError(CFG['keyframes'])
+    if src.startswith('rater:'):
+        d = np.load(os.path.join(ROOT, 'results', 'rater_model', 'raters', src[6:], f'{T.name}.npz'))
+        return {n: {k: d[n][k] for k in keys} for n in BONES}
+    raise ValueError(src)
 
 
 def keyframe_poses(arm, spacing, T):
@@ -119,7 +127,9 @@ def keyframe_poses(arm, spacing, T):
 
 def run_keys(u, c):
     """Correct every given keyframe of one trial at one spacing (keyframe_correction settings)."""
-    T = trial(u['trial']); kc = c['keyframe_correction']; keys = keyframes(T.n_frames, u['spacing'])
+    T = trial(u['trial']); kc = dict(c['keyframe_correction']); keys = keyframes(T.n_frames, u['spacing'])
+    if SOURCE['kc_tol'] is not None:
+        kc['tol'] = SOURCE['kc_tol']
     given = given_keyframes(T, keys)
     fovs, views, sdfs = anchored_setup(T, BONES)
     spline = spline_track(T, given)
@@ -209,9 +219,11 @@ def run_unit(u):
         kp, meta = run_keys(u, c)
         return dict(unit=u, config=c, keyframes={n: {str(k): M for k, M in p.items()} for n, p in kp.items()},
                     meta={str(k): v for k, v in meta.items()}, sec=time.time() - t0, host=socket.gethostname(),
-                    device=str(DEVICE), gpu=torch.cuda.get_device_name() if DEVICE.type == 'cuda' else None)
+                    device=str(DEVICE), gpu=torch.cuda.get_device_name() if DEVICE.type == 'cuda' else None,
+                    keyframe_source=SOURCE['keyframes'], kc_tol=SOURCE['kc_tol'] or c['keyframe_correction']['tol'])
     poses, meta = {'interp': run_interp, 'anchored': run_anchored, 'stepwise': run_stepwise}[c['kind']](u, c)
     return dict(unit=u, config=c, poses={n: {str(f): M for f, M in p.items()} for n, p in poses.items()},
+                keyframe_source=SOURCE['keyframes'],
                 meta=meta, sec=time.time() - t0, host=socket.gethostname(), device=str(DEVICE),
                 torch=torch.__version__, gpu=torch.cuda.get_device_name() if DEVICE.type == 'cuda' else None,
                 workers=int(os.environ.get('WORKERS', '1')), threads=torch.get_num_threads(),
@@ -278,8 +290,12 @@ def main():
     ap.add_argument('--ntasks', type=int, default=1)
     ap.add_argument('--max-units', type=int, default=0)
     ap.add_argument('--quick', action='store_true', help='smoke test: 2 iterations per stage; nothing is saved')
+    ap.add_argument('--keyframes', default=None, help="keyframe source: 'reference' or 'rater:L<level>/r<id>'")
+    ap.add_argument('--kc-tol', default=None, help='keyframe-correction tolerance mm,deg (overrides config)')
     args = ap.parse_args()
     torch.set_num_threads(int(os.environ.get('THREADS', os.environ.get('SLURM_CPUS_PER_TASK', '2'))))
+    if args.keyframes: SOURCE['keyframes'] = args.keyframes
+    if args.kc_tol: SOURCE['kc_tol'] = [float(x) for x in args.kc_tol.split(',')]
     if args.cmd == 'has-kc':
         print('yes' if 'keyframe_correction' in CFG['arms'][args.arm] else 'no'); return
     if args.cmd == 'keys':

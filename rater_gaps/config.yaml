@@ -1,0 +1,18 @@
+# Keyframe gaps with simulated raters (Analysis 2 + 3): the stepwise keyframe-correction method on keyframes
+# from the simulated raters (rater_model/), at the keyframe-gaps spacings, compared with the ideal-keyframe
+# results in results/keyframe_gaps/. Runs keyframe_gaps/run.py once per rater.
+
+levels: [1, 2, 4]                 # rater levels from rater_model (1 = trained, Welte-like)
+raters: 10                        # r00 .. r09 per level
+spacings: [5, 10, 20, 30, 40, full]
+arm: new_opt_stepwise_kc          # GPU arm (keyframe correction -> stepwise chains -> anchored refinement)
+reference_arm: keyframe_interp    # spline interpolation through the same rater keyframes (CPU)
+
+# Keyframe-correction tolerance per level (mm, deg): about the 95th percentile of that level's simulated
+# keyframe error (pivot displacement, rotation), pooled over bones (results/rater_model/raters/summary.md);
+# the trained level's rotation limit is Welte's 2 deg.
+kc_tol: {1: [1.5, 2.0], 2: [3.0, 3.0], 4: [6.0, 6.0]}
+
+# Ideal-keyframe results to compare against (perfect rater)
+ideal_results: results/keyframe_gaps
+ideal_arms: [new_opt_stepwise, keyframe_interp]
