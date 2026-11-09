@@ -5,6 +5,7 @@ Simulated rater keyframes, calibrated to Welte et al. (2022) Figures 4 and 5 (di
 ```bash
 python rater_model/calibrate.py     # fit and check -> results/rater_model/params.json, calibration.md, figures/calibration.png
 python rater_model/generate.py      # rater poses for every frame -> results/rater_model/raters/L<level>/r<id>/<trial>.npz
+python rater_model/export_tra.py    # keyframes per spacing as Autoscoper .tra -> results/rater_model/tra/
 ```
 
 **Model** (`src/raters.py`). For each rater, trial and bone, every frame's pose is the reference pose with a
