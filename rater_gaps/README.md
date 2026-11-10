@@ -11,6 +11,9 @@ compared with the same spacings on ideal (bead-based) keyframes from `results/ke
   moving at most the level's tolerance (`kc_tol` in `config.yaml`: 1.5 mm / 2° at 1×, 3 mm / 3° at 2×,
   6 mm / 6° at 4×, about the 95th percentile of each level's keyframe error). The corrected keyframes then
   anchor the stepwise chains and the anchored refinement, as with ideal keyframes.
+  The correction takes fixed-size steps (`step: mm` in `keyframe_gaps/config.yaml`): the tolerance only caps
+  how far a keyframe can move, not how fast. With steps scaled by the tolerance, the wide 4× tolerance made
+  each step several mm and the fit overshot; see `results/rater_gaps/tests/kc_step/summary.md`.
 - **Reference:** spline interpolation through the same (uncorrected) rater keyframes.
 - **Outcomes:** as keyframe_gaps, plus Welte's helical translation, with frames needing correction counted
   under Welte's criterion (helical rotation > 2° or helical translation > 1 mm) and the positional criterion

@@ -40,6 +40,6 @@ arms:
                         K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1],
                         step_res: [256, 512], step_iters: [20, 20], step_lrs: [0.2, 0.05],
                         keyframe_correction: {tol: [1.0, 2.0], window: 2, key_w: 0.01, res: [256, 512],
-                                              iters: [40, 50], lrs: [0.3, 0.1]}}
+                                              iters: [40, 50], lrs: [0.3, 0.1], step: mm}}
   # Reference: spline interpolation through the same keyframes (CPU, seconds)
   keyframe_interp:  {kind: interp, interp: spline}
