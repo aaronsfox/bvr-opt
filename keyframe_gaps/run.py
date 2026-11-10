@@ -145,7 +145,7 @@ def run_keys(u, c):
         f2f = f2f_for(T, fovs, {n: {f: base[(n, f)] for f in frames} for n in BONES}, frames, BONES, margin=150)
         fit = KeyframeFit(T, views, fovs, f2f, sdfs, BONES, k, frames, base, tol=kc['tol'], w_drr=c['w_drr'],
                           w_f2f=c['w_f2f'], mu=c['mu'], d_min=c['d_min'], key_w=kc['key_w'], res=kc['res'],
-                          iters=iters, lrs=kc['lrs'], log=log)
+                          iters=iters, lrs=kc['lrs'], step=kc.get('step', 'tol'), log=log)
         poses, info = fit.run()
         for n in BONES: out[n][k] = poses[n].tolist()
         meta[k] = info

@@ -52,8 +52,15 @@ def drr_term(views, rads, fovs, bones, poses, dil=3):
 
 
 def _capped(u, cap):
-    """Smooth norm cap: |result| < cap, ~u for |u| << 1 (u is in units of cap)."""
+    """Smooth norm cap: |result| < cap, ~u for |u| << 1 (u is in units of cap, so an optimiser step in u
+    moves the result by about lr * cap: steps grow with the cap)."""
     return cap * u / torch.sqrt(1 + (u * u).sum())
+
+
+def _capped_mm(u, cap):
+    """Smooth norm cap with u in the result's own units (mm or deg): |result| < cap and ~u for |u| << cap, so
+    an optimiser step moves the result by about lr whatever the cap."""
+    return u / torch.sqrt(1 + ((u / cap) ** 2).sum())
 
 
 class AnchoredFit:
@@ -324,17 +331,19 @@ class KeyframeFit:
         Delta(f) = delta + s * v + s^2 * w
     where delta is the correction of the keyframe itself, kept inside a ball of tol = (mm, deg) by a smooth
     norm cap (plus a weak quadratic prior), and v, w (unbounded) let the neighbouring frames follow their
-    own path. Bones are co-fitted; objective = DRR term over the window + frame-to-frame term between
+    own path. step: 'tol' (original) parameterises delta in units of tol, so optimiser steps grow with the
+    tolerance; 'mm' parameterises it in mm / deg, so steps are the same at every tolerance. Bones are co-fitted; objective = DRR term over the window + frame-to-frame term between
     consecutive window frames + contact + priors. Only the corrected keyframe pose is kept.
     base: {(n, f): 4x4} for every window frame (e.g. the spline through the rater's keyframes)."""
 
     def __init__(self, trial, views, fovs, f2f, sdfs, names, k, frames, base, tol=(1.0, 2.0), w_drr=1.0,
                  w_f2f=2.0, mu=0.0, d_min=0.0, key_w=0.01, lam=0.003, res=(256, 512), iters=(40, 50),
-                 lrs=(0.3, 0.1), log=print):
+                 lrs=(0.3, 0.1), step='tol', log=print):
         self.T, self.views, self.fovs, self.f2f, self.sdfs = trial, views, fovs, f2f, sdfs
         self.names, self.k, self.frames = list(names), k, list(frames)
         self.half = max(max(abs(f - k) for f in self.frames), 1)
         self.tol = (float(tol[0]), float(tol[1]))
+        self.cap = _capped_mm if step == 'mm' else _capped     # 'tol': steps scale with tol; 'mm': fixed
         self.w = dict(drr=w_drr, f2f=w_f2f, mu=mu, key=key_w, lam=lam); self.d_min = d_min
         self.sched = list(zip(res, iters, lrs)); self.log = log
         self.base = {(n, f): Pose.from_matrix(base[(n, f)], trial.bones[n].pivot) for n in names for f in self.frames}
@@ -347,7 +356,7 @@ class KeyframeFit:
 
     def delta_key(self, n):
         u = self.U[n]
-        return torch.cat([_capped(u[0], self.tol[0]), _capped(u[1], self.tol[1])])
+        return torch.cat([self.cap(u[0], self.tol[0]), self.cap(u[1], self.tol[1])])
 
     def pose(self, n, f):
         s = (f - self.k) / self.half
