@@ -1,0 +1,274 @@
+<title>BVR Tracking Pipeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one vertical flow, inputs -> three stages -> output, each stage a schematic beside its rules; the objective sits underneath as a reference strip. */
+:root {
+  --bg: #f4f6f7; --surface: #ffffff; --fg: #172026; --muted: #56656d; --line: #d3dbdf;
+  --key: #b8700c; --fwd: #0c7c86; --bwd: #6a4cb5; --fit: #172026; --soft: #e8eef0;
+  --f-display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1316; --surface: #151c20; --fg: #e2e9ec; --muted: #94a4ac; --line: #2a353b;
+  --key: #e3a13a; --fwd: #3db6c0; --bwd: #a68ef2; --fit: #e2e9ec; --soft: #1c252a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1316; --surface: #151c20; --fg: #e2e9ec; --muted: #94a4ac; --line: #2a353b;
+  --key: #e3a13a; --fwd: #3db6c0; --bwd: #a68ef2; --fit: #e2e9ec; --soft: #1c252a; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(26px, 4vw, 34px); }
+h2 { font-size: 20px; }
+h3 { font-size: 15px; }
+p { margin: 0; }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+.lede { color: var(--muted); max-width: 68ch; margin-top: 10px; }
+.eyebrow { font: 500 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend svg { flex: none; }
+
+.flow { display: grid; gap: 0; margin-top: 32px; }
+.connector { display: flex; justify-content: center; height: 34px; }
+.connector svg { height: 34px; width: 20px; }
+
+.inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.input { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; min-width: 0; }
+.input p { color: var(--muted); font-size: 13.5px; }
+
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stage-head { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.num { font: 600 13px/1 var(--f-mono); color: var(--surface); background: var(--fg); border-radius: 4px; padding: 5px 7px; }
+.scope { margin-left: auto; font: 12px/1.3 var(--f-mono); color: var(--muted); }
+.fig { background: var(--soft); border-radius: 6px; padding: 10px; min-width: 0; }
+.fig svg { width: 100%; height: auto; display: block; }
+.fig figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.rules { display: grid; gap: 10px; min-width: 0; }
+.rules ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.params { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin-top: 6px;
+  padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13px; }
+.params dt { font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 1px; }
+.params dd { margin: 0; font-variant-numeric: tabular-nums; }
+.math { font-family: var(--f-mono); font-size: 13px; background: var(--soft); border-radius: 4px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
+
+.output { background: var(--fg); color: var(--bg); border-radius: 8px; padding: 18px 20px; display: grid; gap: 6px; }
+.output p { opacity: 0.8; font-size: 14px; }
+
+.objective { margin-top: 40px; display: grid; gap: 14px; }
+.terms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.term { border-top: 2px solid var(--fg); padding-top: 10px; display: grid; gap: 6px; min-width: 0; }
+.term p { font-size: 13.5px; color: var(--muted); }
+.note { font-size: 13px; color: var(--muted); max-width: 80ch; }
+
+svg text { font-family: var(--f-mono); font-size: 10px; fill: var(--muted); }
+.s-axis { stroke: var(--line); stroke-width: 1.2; fill: none; }
+.s-key { fill: var(--key); }
+.s-keyghost { fill: none; stroke: var(--key); stroke-width: 1.4; stroke-dasharray: 3 2; }
+.s-tol { fill: none; stroke: var(--key); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.7; }
+.s-fwd { fill: var(--fwd); } .s-fwdl { stroke: var(--fwd); stroke-width: 1.5; fill: none; }
+.s-bwd { fill: var(--bwd); } .s-bwdl { stroke: var(--bwd); stroke-width: 1.5; fill: none; }
+.s-fit { stroke: var(--fit); stroke-width: 2; fill: none; }
+.s-start { stroke: var(--muted); stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+.s-hollow { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; }
+.s-ring { fill: none; stroke: var(--fit); stroke-width: 1.3; }
+.s-gray { fill: var(--muted); }
+.s-fwdt { fill: var(--fwd); } .s-bwdt { fill: var(--bwd); } .s-keyt { fill: var(--key); } .s-fitt { fill: var(--fg); }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .inputs, .terms { grid-template-columns: minmax(0, 1fr); }
+  .scope { margin-left: 0; width: 100%; }
+}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Method schematic · arm <code>new_opt_stepwise_kc</code></div>
+  <h1 style="margin-top:8px">Keyframe-corrected stepwise tracking</h1>
+  <p class="lede">How the proposed method turns a rater's keyframes and the biplane radiographs into a pose for every bone in every frame. Each stage starts from the previous stage's result. The tibia, talus and calcaneus are fitted together throughout, so their DRRs overlap correctly and the contact term keeps them apart.</p>
+
+  <div class="legend" aria-label="Legend">
+    <span><svg width="14" height="14" viewBox="0 0 14 14"><path class="s-key" d="M7 1 13 7 7 13 1 7Z"/></svg>Keyframe</span>
+    <span><svg width="14" height="14" viewBox="0 0 14 14"><path class="s-keyghost" d="M7 1.5 12.5 7 7 12.5 1.5 7Z"/></svg>Keyframe as given by the rater</span>
+    <span><svg width="12" height="12" viewBox="0 0 12 12"><circle class="s-fwd" cx="6" cy="6" r="4.5"/></svg>Forward chain</span>
+    <span><svg width="12" height="12" viewBox="0 0 12 12"><circle class="s-bwd" cx="6" cy="6" r="4.5"/></svg>Backward chain</span>
+    <span><svg width="26" height="10" viewBox="0 0 26 10"><path class="s-start" d="M1 5H25"/></svg>Starting path</span>
+    <span><svg width="26" height="10" viewBox="0 0 26 10"><path class="s-fit" d="M1 5H25"/></svg>Fitted path</span>
+  </div>
+
+  <div class="flow">
+    <section class="inputs" aria-label="Inputs">
+      <div class="input">
+        <div class="eyebrow">Input</div>
+        <h3>Biplane radiographs</h3>
+        <p>Two calibrated views per frame, N frames per trial.</p>
+      </div>
+      <div class="input">
+        <div class="eyebrow">Input</div>
+        <h3>CT bone models</h3>
+        <p>Tibia, talus and calcaneus volumes. Rendered as DRRs, and as signed distance fields for contact.</p>
+      </div>
+      <div class="input">
+        <div class="eyebrow">Input</div>
+        <h3>Rater keyframes</h3>
+        <p>Poses every <i>s</i> frames, with bookends at frame 5 and N − 6. These come from the user and may be off.</p>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><svg viewBox="0 0 20 34"><path class="s-axis" d="M10 2V30M5 25 10 31 15 25" style="stroke:var(--muted)"/></svg></div>
+
+    <!-- Stage 1 -->
+    <section class="stage">
+      <div class="stage-head"><span class="num">1</span><h2>Keyframe correction</h2><span class="scope">once per keyframe · one job per trial</span></div>
+      <figure class="fig" style="margin:0">
+        <svg viewBox="0 0 320 150" role="img" aria-label="Keyframe k is refitted over frames k minus 2 to k plus 2 and may move only within a tolerance region around the given pose">
+          <path class="s-axis" d="M20 120H300"/>
+          <g>
+            <path class="s-axis" d="M48 116v8M104 116v8M160 116v8M216 116v8M272 116v8"/>
+            <text x="48" y="140" text-anchor="middle">k−2</text><text x="104" y="140" text-anchor="middle">k−1</text>
+            <text x="160" y="140" text-anchor="middle">k</text><text x="216" y="140" text-anchor="middle">k+1</text><text x="272" y="140" text-anchor="middle">k+2</text>
+          </g>
+          <!-- given path through rater keyframe (dashed) and refit window path -->
+          <path class="s-start" d="M48 74C90 70 130 62 160 60S240 58 272 64"/>
+          <path class="s-fit" d="M48 84C90 82 130 78 160 78S240 76 272 80"/>
+          <circle class="s-hollow" cx="48" cy="84" r="4"/><circle class="s-hollow" cx="104" cy="80.5" r="4"/>
+          <circle class="s-hollow" cx="216" cy="77.2" r="4"/><circle class="s-hollow" cx="272" cy="80" r="4"/>
+          <circle class="s-tol" cx="160" cy="60" r="30"/>
+          <path class="s-keyghost" d="M160 51 169 60 160 69 151 60Z"/>
+          <path class="s-key" d="M160 69 169 78 160 87 151 78Z"/>
+          <text x="194" y="30" class="s-keyt">tolerance</text>
+          <path d="M192 33 180 40" stroke="var(--key)" stroke-width="1" fill="none"/>
+          <text x="20" y="20">neighbours fitted, then discarded</text>
+        </svg>
+        <figcaption>The given keyframe (dashed) moves to the corrected pose (solid), inside its tolerance.</figcaption>
+      </figure>
+      <div class="rules">
+        <p>Each given keyframe is refitted to the images of the frames around it. Only the corrected keyframe is kept.</p>
+        <ul>
+          <li>Over the window, each bone's pose is the given path times a smooth increment: <span class="math" style="display:inline-block;padding:2px 6px">Δ(f) = δ + s·v + s²·w,  s = (f − k)/2</span></li>
+          <li>δ is the keyframe's own correction. It is capped smoothly at the tolerance, with a weak prior keeping it small.</li>
+          <li>Steps are a fixed size in mm and degrees, so a wide tolerance does not mean larger steps.</li>
+        </ul>
+        <dl class="params">
+          <dt>window</dt><dd>±2 frames</dd>
+          <dt>tolerance</dt><dd>1.5 mm / 2° at 1× · 3 mm / 3° at 2× · 6 mm / 6° at 4× (ideal keyframes: 1 mm / 2°)</dd>
+          <dt>objective</dt><dd>DRR + frame-to-frame + contact</dd>
+          <dt>schedule</dt><dd>256 px, 40 iterations → 512 px, 50 iterations</dd>
+        </dl>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><svg viewBox="0 0 20 34"><path class="s-axis" d="M10 2V30M5 25 10 31 15 25" style="stroke:var(--muted)"/></svg></div>
+
+    <!-- Stage 2 -->
+    <section class="stage">
+      <div class="stage-head"><span class="num">2</span><h2>Stepwise chains</h2><span class="scope">per gap between keyframes a and b · corrected keyframes held fixed</span></div>
+      <figure class="fig" style="margin:0">
+        <svg viewBox="0 0 320 170" role="img" aria-label="A forward chain steps frame by frame from keyframe a and a backward chain from keyframe b; the two are blended by distance to each keyframe">
+          <text x="20" y="16">forward from a</text>
+          <path class="s-fwdl" d="M40 34H272" opacity="0.35"/>
+          <circle class="s-fwd" cx="80" cy="34" r="5"/><circle class="s-fwd" cx="120" cy="34" r="5"/><circle class="s-fwd" cx="160" cy="34" r="5"/>
+          <circle class="s-fwd" cx="200" cy="34" r="5" opacity="0.8"/><circle class="s-fwd" cx="240" cy="34" r="5" opacity="0.6"/>
+          <path class="s-key" d="M40 26 48 34 40 42 32 34Z"/><path class="s-key" d="M280 26 288 34 280 42 272 34Z"/>
+
+          <text x="20" y="64">backward from b</text>
+          <path class="s-bwdl" d="M48 82H280" opacity="0.35"/>
+          <circle class="s-bwd" cx="80" cy="82" r="5" opacity="0.6"/><circle class="s-bwd" cx="120" cy="82" r="5" opacity="0.8"/>
+          <circle class="s-bwd" cx="160" cy="82" r="5"/><circle class="s-bwd" cx="200" cy="82" r="5"/><circle class="s-bwd" cx="240" cy="82" r="5"/>
+          <path class="s-key" d="M40 74 48 82 40 90 32 82Z"/><path class="s-key" d="M280 74 288 82 280 90 272 82Z"/>
+
+          <text x="20" y="114">blend</text>
+          <defs>
+            <linearGradient id="bl" x1="0" x2="1"><stop offset="0" style="stop-color:var(--fwd)"/><stop offset="1" style="stop-color:var(--bwd)"/></linearGradient>
+          </defs>
+          <path d="M40 132H280" stroke="url(#bl)" stroke-width="3" fill="none"/>
+          <path class="s-key" d="M40 124 48 132 40 140 32 132Z"/><path class="s-key" d="M280 124 288 132 280 140 272 132Z"/>
+          <text x="40" y="160" text-anchor="middle" class="s-keyt">a</text><text x="280" y="160" text-anchor="middle" class="s-keyt">b</text>
+          <text x="160" y="160" text-anchor="middle">weight on b = (f − a)/(b − a)</text>
+        </svg>
+        <figcaption>Each chain is trusted most near the keyframe it started from.</figcaption>
+      </figure>
+      <div class="rules">
+        <p>From each keyframe, step one frame at a time into the gap, so every frame starts within about 1–2 mm of where it should be. That's inside the range the fit can recover from, unlike a spline start across a long gap.</p>
+        <ul>
+          <li>Each frame starts from a constant-velocity prediction from the two frames before it: <span class="math" style="display:inline-block;padding:2px 6px">M₁ · M₂⁻¹ · M₁</span></li>
+          <li>That frame is fitted on its own, linked by the frame-to-frame term to the frame just fitted.</li>
+          <li>The forward and backward chains are blended frame by frame: rotation along the geodesic between them, pivot position linearly.</li>
+        </ul>
+        <dl class="params">
+          <dt>objective</dt><dd>DRR + frame-to-frame (previous frame) + contact</dd>
+          <dt>schedule</dt><dd>256 px, 20 iterations → 512 px, 20 iterations, per frame</dd>
+        </dl>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><svg viewBox="0 0 20 34"><path class="s-axis" d="M10 2V30M5 25 10 31 15 25" style="stroke:var(--muted)"/></svg></div>
+
+    <!-- Stage 3 -->
+    <section class="stage">
+      <div class="stage-head"><span class="num">3</span><h2>Anchored refinement</h2><span class="scope">per gap · keyframes are hard anchors</span></div>
+      <figure class="fig" style="margin:0">
+        <svg viewBox="0 0 320 150" role="img" aria-label="The blended path is refined as a whole by a smooth correction that is zero at both keyframes">
+          <path class="s-axis" d="M20 124H300"/>
+          <path class="s-start" d="M40 90C90 60 130 40 170 52S250 96 280 70"/>
+          <path class="s-fit" d="M40 90C90 72 130 54 170 62S250 88 280 70"/>
+          <circle class="s-ring" cx="96" cy="70.5" r="6"/><circle class="s-ring" cx="150" cy="58" r="6"/>
+          <circle class="s-ring" cx="206" cy="72" r="6"/><circle class="s-ring" cx="246" cy="82.5" r="6"/>
+          <path class="s-key" d="M40 81 49 90 40 99 31 90Z"/><path class="s-key" d="M280 61 289 70 280 79 271 70Z"/>
+          <path d="M40 99V124M280 79V124" stroke="var(--key)" stroke-width="1" stroke-dasharray="2 2"/>
+          <text x="40" y="140" text-anchor="middle" class="s-keyt">a</text><text x="280" y="140" text-anchor="middle" class="s-keyt">b</text>
+          <text x="160" y="140" text-anchor="middle">frames sampled each iteration ◯</text>
+          <text x="20" y="20">correction is zero at both keyframes</text>
+        </svg>
+        <figcaption>The blended chains (dashed) are refined together into one smooth path (solid).</figcaption>
+      </figure>
+      <div class="rules">
+        <p>The whole gap is refined at once, starting from the blended chains. This smooths frame-to-frame noise left by the chains while keeping every frame consistent with the images.</p>
+        <ul>
+          <li>Each bone's path is the starting path times a sine-series correction that vanishes at both keyframes: <span class="math" style="display:inline-block;padding:2px 6px">Δ(f) = Σₖ cₖ · sin(kπ(f − a)/(b − a))</span></li>
+          <li>The number of sine terms and frames sampled per iteration scale with gap length, so every frame gets the same flexibility and image data at any spacing.</li>
+        </ul>
+        <dl class="params">
+          <dt>basis</dt><dd>K = 3 sine terms per 10 frames of gap</dd>
+          <dt>sampling</dt><dd>4 frames per 10 frames of gap, each iteration</dd>
+          <dt>objective</dt><dd>DRR + frame-to-frame + contact + small penalty on c</dd>
+          <dt>schedule</dt><dd>256 px, 40 iterations → 512 px, 50 iterations</dd>
+        </dl>
+      </div>
+    </section>
+
+    <div class="connector" aria-hidden="true"><svg viewBox="0 0 20 34"><path class="s-axis" d="M10 2V30M5 25 10 31 15 25" style="stroke:var(--muted)"/></svg></div>
+
+    <section class="output">
+      <div class="eyebrow" style="color:inherit;opacity:0.7">Output</div>
+      <h2>Pose of every bone in every frame</h2>
+      <p>Corrected keyframes plus the refined gaps, saved as <code>.npz</code> and as Autoscoper <code>.tra</code> files. Scored against the bead-based reference: pivot error, helical rotation and translation, and frames beyond Welte's 1 mm / 2° standard.</p>
+    </section>
+  </div>
+
+  <section class="objective" aria-labelledby="obj">
+    <h2 id="obj">The objective used in every stage</h2>
+    <div class="math">L = 1.0 · DRR + 2.0 · frame-to-frame + 0.01 · contact  (+ 0.003 · Σ|c|² in stage 3)</div>
+    <div class="terms">
+      <div class="term">
+        <h3>DRR</h3>
+        <p>All three bones are rendered together into one DRR per camera. Each bone scores 1 − signed gradient correlation with the radiograph, inside its own silhouette.</p>
+      </div>
+      <div class="term">
+        <h3>Frame-to-frame</h3>
+        <p>Points on strong CT edges are projected into neighbouring frames with each frame's pose. The same anatomy should land on the same image edges in both frames (NCC of gradient images).</p>
+      </div>
+      <div class="term">
+        <h3>Contact</h3>
+        <p>Surface points of each bone are checked against the other bones' signed distance fields. Penetration beyond 2 mm is penalised, which allows for cartilage and segmentation error.</p>
+      </div>
+    </div>
+    <p class="note">The comparison arm <code>keyframe_interp</code> is the spline through the given keyframes alone, with no image fitting. <code>new_opt</code> skips stages 1 and 2 and refines from that spline instead.</p>
+  </section>
+</div>
