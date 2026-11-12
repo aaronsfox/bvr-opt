@@ -30,6 +30,7 @@ import yaml  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+from src import plotstyle as ps  # noqa: E402
 from src.raters import draw_track, helical_metrics  # noqa: E402
 
 CFG = yaml.safe_load(open(os.path.join(ROOT, 'rater_model', 'config.yaml')))
@@ -194,35 +195,39 @@ def main():
 
 
 def figure(f4, f5, sims, params):
-    """Welte operators (median, IQR) next to 12 simulated trained raters, per bone and quantity; plus Figure 5."""
-    fig, ax = plt.subplots(3, 3, figsize=(15, 11), gridspec_kw=dict(width_ratios=[1, 1, 1.25]))
+    """Welte operators (median, frame range) next to 12 simulated trained raters, per bone and quantity; plus Figure 5.
+    Colour and marker: Welte operators = palette 0, simulated raters = palette 1."""
+    ps.apply()
+    fig, ax = plt.subplots(3, 3, figsize=(ps.DOUBLE, 6.6), gridspec_kw=dict(width_ratios=[1, 1, 1.25]))
     ops = ['New operator 1', 'New operator 2', 'Expert']
+    W, S = ps.style(0), ps.style(1)
     for i, (b, name) in enumerate(BONES.items()):
         for j, q in enumerate(Q):
             a = ax[i, j]; w = f4[(f4.bone == b) & (f4.quantity == q)].set_index('rater')
             for k, o in enumerate(ops):                    # Welte: median and range of the 41 frames
                 a.errorbar(k, w.loc[o, 'median'], yerr=[[w.loc[o, 'median'] - w.loc[o, 'vertical_line_low']],
                                                          [w.loc[o, 'vertical_line_high'] - w.loc[o, 'median']]],
-                           fmt='o', color='C3', capsize=3, lw=2)
+                           fmt=W['marker'], color=W['color'], capsize=2, lw=1.2, ms=4)
             sim = sims[b][q][:12]
             for k, x in enumerate(sim):
-                a.violinplot(x, positions=[4 + k], widths=0.8, showextrema=False)
+                v = a.violinplot(x, positions=[4 + k], widths=0.8, showextrema=False)
+                for body in v['bodies']:
+                    body.set(facecolor=S['color'], alpha=0.25, edgecolor='none')
                 a.errorbar(4 + k, np.median(x), yerr=[[np.median(x) - x.min()], [x.max() - np.median(x)]],
-                           fmt='o', color='C0', capsize=2, lw=1.5, ms=4)
-            a.axvline(3, color='0.8', lw=0.8); a.set_xticks([1, 9.5], ['Welte operators', 'Simulated trained raters'])
-            a.set_title(f'{name}: {Q[q]}', fontsize=10)
+                           fmt=S['marker'], color=S['color'], capsize=1.5, lw=0.9, ms=3)
+            a.axvline(3, color='0.8', lw=0.8); a.set_xticks([1, 9.5], ['Welte operators', 'Simulated raters'])
+            a.set_title(f'{name}: {Q[q]}', fontsize=8)
         a = ax[i, 2]; col = {'cal': 'calcaneus', 'tal': 'talus', 'tib': 'tibia'}[b] + '_rotation_bias_deg'
-        a.plot(f5.frame_index, f5[col], 'o-', color='C3', label='Welte New operator 2')
+        a.plot(f5.frame_index, f5[col], '-', **W, ms=3, label='Welte, new operator 2')
         rng = np.random.default_rng(5)
-        from src.raters import draw_track
         for k in range(3):
             r, t = draw_track(rng, len(f5), params['scale'][b]['rotation_deg'], params['scale'][b]['translation_mm'],
                               params['offset_share'][b], params['offset_share_trans'][b], params['phi'], params['between']['rotation_deg'])
-            a.plot(f5.frame_index, np.linalg.norm(r, axis=1), '-', color='C0', alpha=.6, label='Simulated raters' if k == 0 else None)
-        a.set_title(f'{name}: rotation error by frame (Figure 5)', fontsize=10); a.set_xlabel('Frame')
-        if i == 0: a.legend(fontsize=8)
-    fig.suptitle('Rater model calibration: Welte et al. (2022) operators (red) vs simulated trained raters (blue); points = median, bars = range of 41 frames')
-    plt.tight_layout(rect=(0, 0, 1, 0.97)); plt.savefig(os.path.join(OUT, 'figures', 'calibration.png'), dpi=110)
+            a.plot(f5.frame_index, np.linalg.norm(r, axis=1), '-', color=S['color'], lw=1, alpha=.6,
+                   label='Simulated raters' if k == 0 else None)
+        a.set_title(f'{name}: rotation error by frame', fontsize=8); a.set_xlabel('Frame')
+    fig.legend(*ax[0, 2].get_legend_handles_labels(), loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.01))
+    fig.tight_layout(rect=(0, 0.04, 1, 1)); ps.save(fig, os.path.join(OUT, 'figures', 'calibration.png')); plt.close(fig)
 
 
 if __name__ == '__main__':

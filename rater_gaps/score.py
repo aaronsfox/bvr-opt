@@ -30,6 +30,7 @@ import yaml  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'keyframe_gaps')); sys.path.insert(1, ROOT)
 import run as kg  # noqa: E402  (keyframe_gaps/run.py)
+from src import plotstyle as ps  # noqa: E402
 from src.geometry import helical_error, pivot_error  # noqa: E402
 
 RG = yaml.safe_load(open(os.path.join(ROOT, 'rater_gaps', 'config.yaml')))
@@ -181,25 +182,28 @@ def rater_spread(df):
 
 
 def figure(df, path):
-    fig, ax = plt.subplots(1, 3, figsize=(17, 4.8))
+    """Median pivot and rotation error and % needing correction against spacing, per keyframe quality.
+    Colour and marker = keyframe quality (ideal, 1x, 2x, 4x); solid filled = method, dotted open = interpolation."""
+    ps.apply()
+    fig, ax = plt.subplots(1, 3, figsize=(ps.DOUBLE, 2.6))
     x = np.arange(len(SP))
-    series = [('ideal', 'keyframe_interp', 'k', ':'), ('ideal', 'new_opt_stepwise', 'k', '-')]
-    for i, L in enumerate(RG['levels']):
-        series += [(str(L), RG['reference_arm'], f'C{i}', ':'), (str(L), RG['arm'], f'C{i}', '-')]
-    for lv, arm, col, ls in series:
-        d = df[(df.level == lv) & (df.arm == arm) & df.item.isin(BONES)]
-        if d.empty:
-            continue
-        lab = f'{"ideal" if lv == "ideal" else lv + "×"} {"interp" if "interp" in arm else "stepwise"}'
-        ax[0].plot(x, [d[d.spacing == s].pivot_mm.median() for s in SP], ls, marker='o', color=col, label=lab)
-        ax[1].plot(x, [d[d.spacing == s].rot_deg.median() for s in SP], ls, marker='o', color=col)
-        ax[2].plot(x, [100 * needs(d[d.spacing == s])['welte'].mean() for s in SP], ls, marker='o', color=col)
-    for a, t in zip(ax, ['Median pivot error (mm)', 'Median rotation error (°)', 'Needs correction, Welte criterion (%)']):
-        a.set_xticks(x, SP); a.set_xlabel('Keyframe spacing (frames)'); a.set_title(t)
-    ax[0].set_yscale('log'); ax[1].set_yscale('log')
-    fig.legend(loc='lower center', ncol=8, frameon=False, fontsize=9)
-    fig.suptitle('Simulated raters: interpolation (dotted) and stepwise keyframe-correction method (solid), vs ideal keyframes (black)')
-    plt.tight_layout(rect=(0, 0.08, 1, 0.94)); plt.savefig(path, dpi=110)
+    levels = ['ideal'] + [str(L) for L in RG['levels']]
+    for i, lv in enumerate(levels):
+        for arm in ([RG['reference_arm'], 'new_opt_stepwise'] if lv == 'ideal' else [RG['reference_arm'], RG['arm']]):
+            d = df[(df.level == lv) & (df.arm == arm) & df.item.isin(BONES)]
+            if d.empty:
+                continue
+            interp = 'interp' in arm
+            kw = dict(ls=':' if interp else '-', **ps.style(i, hollow=interp))
+            lab = f'{"Ideal" if lv == "ideal" else lv + "×"}, {"interpolation" if interp else "method"}'
+            ax[0].plot(x, [d[d.spacing == s].pivot_mm.median() for s in SP], label=lab, **kw)
+            ax[1].plot(x, [d[d.spacing == s].rot_deg.median() for s in SP], **kw)
+            ax[2].plot(x, [100 * needs(d[d.spacing == s])['welte'].mean() for s in SP], **kw)
+    for a, t in zip(ax, ['Median pivot error (mm)', 'Median rotation error (°)', 'Needs correction, Welte (%)']):
+        a.set_xticks(x, SP); a.set_xlabel('Keyframe spacing (frames)'); a.set_ylabel(t)
+    ax[0].set_yscale('log'); ax[1].set_yscale('log'); ps.plain_log(ax[0]); ps.plain_log(ax[1]); ax[2].set_ylim(0, 100)
+    fig.legend(loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=(0, 0.14, 1, 1)); ps.save(fig, path); plt.close(fig)
 
 
 def main():

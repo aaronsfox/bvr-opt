@@ -30,6 +30,7 @@ import torch  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run import CFG, RESULTS, arm_dir, keyframes, trial  # noqa: E402
 from src import collision  # noqa: E402
+from src import plotstyle as ps  # noqa: E402
 from src.geometry import helical_error, pivot_error  # noqa: E402
 
 BONES = CFG['bones']; JOINTS = [('tib', 'tal'), ('tal', 'cal')]
@@ -177,22 +178,23 @@ def compute(arms):
 
 
 def figure(df, path):
+    """Pivot error against keyframe spacing per bone (perfect keyframes): median solid, 95th percentile dashed."""
+    ps.apply()
     arms = [a for a in ARMS if (df.arm == a).any()]
-    fig, ax = plt.subplots(1, 3, figsize=(16, 4.6))
+    fig, ax = plt.subplots(1, 3, figsize=(ps.DOUBLE, 2.6), sharey=True)
     x = np.arange(len(SP))
     for i, arm in enumerate(arms):
         for j, n in enumerate(BONES):
             d = df[(df.arm == arm) & (df.item == n)]
             med = [d[d.spacing == s].pivot_mm.median() for s in SP]; p95 = [q95(d[d.spacing == s].pivot_mm) for s in SP]
-            ax[j].plot(x, med, 'o-', color=f'C{i}', label=f'{arm} median' if j == 0 else None)
-            ax[j].plot(x, p95, 's--', color=f'C{i}', alpha=.6, label=f'{arm} 95th pct' if j == 0 else None)
+            ax[j].plot(x, med, '-', **ps.style(i), label=f'{arm}, median' if j == 0 else None)
+            ax[j].plot(x, p95, '--', **ps.style(i, hollow=True), label=f'{arm}, 95th percentile' if j == 0 else None)
     for j, n in enumerate(BONES):
-        ax[j].axhline(TH['pivot_mm'], color='0.6', ls=':', lw=1); ax[j].set_xticks(x, SP)
-        ax[j].set_title(NAME[n]); ax[j].set_xlabel('Keyframe spacing (frames)'); ax[j].set_yscale('log')
+        ax[j].axhline(TH['pivot_mm'], color='0.5', ls=':', lw=0.8); ax[j].set_xticks(x, SP)
+        ax[j].set_title(NAME[n]); ax[j].set_xlabel('Keyframe spacing (frames)'); ax[j].set_yscale('log'); ps.plain_log(ax[j])
     ax[0].set_ylabel('Pivot error (mm)')
-    fig.legend(loc='lower center', ncol=4, frameon=False)
-    fig.suptitle('Keyframe gaps: error against the bead-based reference, perfect keyframes (dotted: 1 mm)')
-    plt.tight_layout(rect=(0, 0.08, 1, 0.95)); plt.savefig(path, dpi=110)
+    fig.legend(loc='lower center', ncol=min(4, 2 * len(arms)), bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=(0, 0.06 * (1 + (2 * len(arms) - 1) // 4), 1, 1)); ps.save(fig, path); plt.close(fig)
 
 
 def main():

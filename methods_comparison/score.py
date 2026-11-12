@@ -27,6 +27,7 @@ import torch  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run import CFG, RESULTS, keyframes, trial  # noqa: E402
 from src import collision  # noqa: E402
+from src import plotstyle as ps  # noqa: E402
 from src.geometry import butterworth, helical_error, pivot_error  # noqa: E402
 
 BONES = CFG['bones']; JOINTS = [('tib', 'tal'), ('tal', 'cal')]
@@ -111,18 +112,24 @@ def summary(df):
 
 
 def figure(df, path):
+    """Error distribution per arm and bone (unfiltered); each arm keeps its palette colour and marker."""
+    ps.apply()
     d0 = df[df['filter'] == 'none']; arms = list(dict.fromkeys(d0.arm))
-    fig, ax = plt.subplots(2, 3, figsize=(4 + 1.1 * len(arms) * 3, 8), squeeze=False)
+    fig, ax = plt.subplots(2, 3, figsize=(ps.DOUBLE, 4.6), squeeze=False, sharex=True)
     for j, n in enumerate(BONES):
         for i, m in enumerate(['pivot_mm', 'rot_deg']):
-            data = [d0[(d0.arm == a) & (d0.item == n)][m].values for a in arms]
-            ax[i, j].boxplot(data, showfliers=True, flierprops=dict(ms=2))
-            ax[i, j].set_xticks(range(1, len(arms) + 1), arms, rotation=45, ha='right')
-            ax[i, j].set_yscale('log'); ax[i, j].axhline(TH['pivot_mm'] if m == 'pivot_mm' else TH['rot_deg'], color='0.6', ls='--', lw=0.8)
-            if j == 0: ax[i, j].set_ylabel('Pivot error (mm)' if m == 'pivot_mm' else 'Helical rotation error (°)')
+            a = ax[i, j]
+            data = [d0[(d0.arm == arm) & (d0.item == n)][m].values for arm in arms]
+            bp = a.boxplot(data, patch_artist=True, widths=0.6, medianprops=dict(color='black', lw=1.2),
+                           whiskerprops=dict(lw=0.8), capprops=dict(lw=0.8))
+            for k, (box, fl) in enumerate(zip(bp['boxes'], bp['fliers'])):
+                box.set(facecolor=ps.color(k), alpha=0.75, lw=0.8)
+                fl.set(marker=ps.marker(k), markerfacecolor=ps.color(k), markeredgecolor=ps.color(k), markersize=2, alpha=0.6)
+            a.set_yscale('log'); ps.plain_log(a); a.axhline(TH['pivot_mm'] if m == 'pivot_mm' else TH['rot_deg'], color='0.5', ls='--', lw=0.8)
+            a.set_xticks(range(1, len(arms) + 1), arms, rotation=45, ha='right')
+            if j == 0: a.set_ylabel('Pivot error (mm)' if m == 'pivot_mm' else 'Helical rotation error (°)')
         ax[0, j].set_title(NAME[n])
-    fig.suptitle('Methods comparison: error against the bead-based reference (unfiltered; dashed: Welte operator standard)')
-    plt.tight_layout(); plt.savefig(path, dpi=110)
+    fig.tight_layout(); ps.save(fig, path); plt.close(fig)
 
 
 def compute_table(arms):
