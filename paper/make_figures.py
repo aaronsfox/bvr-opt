@@ -179,6 +179,59 @@ def figure3(k):
     fig.tight_layout(); fig.subplots_adjust(bottom=0.17); ps.save(fig, os.path.join(OUT, 'figure3_refitting.png')); plt.close(fig)
 
 
+def figure_aim1(d):
+    """Aim 1 (reference keyframes): rows = tibia, talus, calcaneus, all bones; columns = helical translation error,
+    helical rotation error (boxplots over every scored frame: median, IQR, whiskers to 1.5 IQR, outliers not drawn)
+    and frames needing correction (%, bars). x = keyframe spacing; hue = refinement vs spline interpolation."""
+    ps.apply()
+    e0 = d[d.level == 'ideal']
+    arms = [('Refinement', METHOD['ideal'], 0), ('Spline interpolation', INTERP, 1)]
+    rows = [('tib', 'Tibia'), ('tal', 'Talus'), ('cal', 'Calcaneus'), (None, 'All bones')]
+    cols = [('hel_mm', 'Helical translation error (mm)', TH_TR), ('rot_deg', 'Helical rotation error (°)', TH_ROT),
+            ('bad', 'Frames needing correction (%)', None)]
+    fig, ax = plt.subplots(len(rows), 3, figsize=(ps.DOUBLE, 8.2), sharex=True, sharey='col')
+    x = np.arange(len(SP)); w = 0.36
+    for i, (b, bl) in enumerate(rows):
+        eb = e0 if b is None else e0[e0.item == b]
+        for j, (col, yl, th) in enumerate(cols):
+            a = ax[i, j]
+            for k, (lab, arm, ci) in enumerate(arms):
+                off = (k - 0.5) * (w + 0.04)
+                ea = eb[eb.arm == arm]
+                if col == 'bad':
+                    v = [100 * ea[ea.spacing == s_].bad.mean() for s_ in SP]
+                    a.bar(x + off, v, width=w, color=ps.color(ci), label=lab if i == 0 else None)
+                    if k == 0:                                   # refinement values are small: print them
+                        for xi, vi in zip(x + off, v):
+                            a.text(xi, vi + 2, f'{vi:.0f}' if vi >= 0.5 or vi == 0 else '<1', ha='center', va='bottom',
+                                   fontsize=6, color=ps.color(ci))
+                else:
+                    data = [ea[ea.spacing == s_][col].values for s_ in SP]
+                    bp = a.boxplot(data, positions=x + off, widths=w, showfliers=False, patch_artist=True,
+                                   medianprops=dict(color='black', lw=1.1), whiskerprops=dict(color=ps.color(ci), lw=0.9),
+                                   capprops=dict(color=ps.color(ci), lw=0.9))
+                    for bx in bp['boxes']:
+                        bx.set(facecolor=ps.color(ci), edgecolor=ps.color(ci), alpha=0.85)
+            if th is not None:
+                a.axhline(th, color='0.5', ls='--', lw=0.8, zorder=0)
+                a.set_yscale('log'); a.set_ylim(*((0.005, 50) if col == 'hel_mm' else (0.01, 30))); ps.plain_log(a)
+            else:
+                a.set_ylim(0, 100)
+            if i == 0:
+                a.set_title(yl, fontsize=8)
+            if j == 0:
+                a.set_ylabel(bl, fontsize=9)
+            if i == len(rows) - 1:
+                a.set_xticks(x, SPL); a.set_xlabel('Keyframe spacing (frames)')
+    for i in range(len(rows)):
+        for j in range(3):
+            ax[i, j].text(-0.2, 1.03, 'abcdefghijkl'[3 * i + j], transform=ax[i, j].transAxes, fontsize=10, fontweight='bold')
+    from matplotlib.patches import Patch
+    fig.legend([Patch(facecolor=ps.color(c), edgecolor=ps.color(c)) for _, _, c in arms], [l for l, _, _ in arms],
+               loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.005))
+    fig.tight_layout(rect=(0, 0.03, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure2_aim1.png')); plt.close(fig)
+
+
 def checks(d, k):
     """Share of 4x refinement frames needing correction that lie in tracks with an unrecovered keyframe (Welte)."""
     kb = k[k.kind == 'corrected'].groupby(['level', 'rater', 'spacing', 'trial', 'item']).bad.any().rename('kbad')
@@ -202,7 +255,7 @@ def checks(d, k):
 def main():
     d, k = load()
     t = summarise(d); t.to_csv(os.path.join(OUT, 'summary_long.csv'), index=False)
-    table1(t); figure2(t); refitting(k); figure3(k); checks(d, k)
+    table1(t); figure2(t); figure_aim1(d); refitting(k); figure3(k); checks(d, k)
     print('written to', OUT)
 
 
