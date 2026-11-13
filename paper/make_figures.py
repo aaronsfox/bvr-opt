@@ -238,8 +238,8 @@ def table_aim1(d):
             for col, q in (('hel_mm', 'Translation (mm)'), ('rot_deg', 'Rotation (°)')):
                 for lab, arm, _ in AIM1_ARMS:
                     v = eb[(eb.arm == arm) & (eb.spacing == s_)][col].values
-                    lo, hi = boot_median_frames(v, rng)
-                    r[f'{q}: {lab}'] = f'{np.median(v):.2f} ({lo:.2f}–{hi:.2f}) [{np.percentile(v, 95):.2f}]'
+                    p_lo, p_hi = np.percentile(v, [2.5, 97.5])
+                    r[f'{q}: {lab}'] = f'{np.median(v):.2f} [{p_lo:.2f}–{p_hi:.2f}]'
             for lab, arm, _ in AIM1_ARMS:
                 r[f'Needs Correction (%): {lab}'] = f'{100 * eb[(eb.arm == arm) & (eb.spacing == s_)].bad.mean():.1f}'
             rows.append(r)
@@ -249,11 +249,11 @@ def table_aim1(d):
         T.to_excel(os.path.join(OUT, 'table_aim1.xlsx'), index=False)
     except Exception as ex:
         print('xlsx skipped:', ex)
-    note = ('Tracking error between keyframes with reference (marker-based) keyframes: median (95% CI) [95th percentile] helical '
+    note = ('Tracking error between keyframes with reference (marker-based) keyframes: median [2.5th–97.5th percentile] helical '
             'translation and rotation error, and the percentage of frames needing correction (rotation > 2° or '
             'translation > 1 mm; Welte et al., 2022), for image refinement and spline interpolation. Every scored '
-            'frame of the four trials contributes one value per bone. CIs: percentile bootstrap of the median over '
-            'frames (2,000 resamples). "Trial" = keyframes at the first and last tracked frames only.')
+            'frame of the four trials contributes one value per bone; percentiles are across frames. "Trial" = keyframes '
+            'at the first and last tracked frames only.')
     with open(os.path.join(OUT, 'table_aim1.md'), 'w') as fh:
         fh.write(note + '\n\n' + T.to_markdown(index=False) + '\n')
     return T
