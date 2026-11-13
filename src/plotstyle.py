@@ -66,11 +66,11 @@ def style(i, hollow=False):
     return s
 
 
-def plain_log(ax, axis='y'):
-    """Log scale with plain tick labels at 1, 2 and 5 per decade (0.1, 0.2, 0.5, 1 ...), not powers of ten."""
+def plain_log(ax, axis='y', subs=(1, 2, 5)):
+    """Log scale with plain tick labels (0.1, 0.2, 0.5, 1 ...), not powers of ten. subs=(1,) labels decades only."""
     from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
     a = ax.yaxis if axis == 'y' else ax.xaxis
-    a.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
+    a.set_major_locator(LogLocator(base=10, subs=subs))
     a.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}')); a.set_minor_formatter(NullFormatter())
 
 
