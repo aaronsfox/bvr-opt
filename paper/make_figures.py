@@ -127,7 +127,11 @@ def figure2(t):
     fig.tight_layout(rect=(0, 0.16, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure2_spacing.png')); plt.close(fig)
 
 
+KF_SPACING = '5'   # each keyframe position once (given keyframes repeat across spacings)
+
+
 def refitting(k):
+    k = k[k.spacing == KF_SPACING]
     rows = []
     for lv, lab in GROUPS[1:]:
         r = dict(group=lab)
@@ -140,33 +144,39 @@ def refitting(k):
     T = pd.DataFrame(rows)
     T.to_csv(os.path.join(OUT, 'table_refitting.csv'), index=False)
     with open(os.path.join(OUT, 'table_refitting.md'), 'w') as fh:
-        fh.write('Keyframe error before (given) and after refitting: median [95th percentile]; all spacings, bones and '
-                 'raters pooled.\n\n' + T.to_markdown(index=False) + '\n')
+        fh.write('Keyframe error before (given) and after refitting: median [95th percentile]; 5-frame spacing (every '
+                 'keyframe position once; 1,200 bone-keyframes per group), bones and raters pooled. Other spacings give '
+                 'medians within 0.05 deg and 0.03 mm.\n\n' + T.to_markdown(index=False) + '\n')
     return T
 
 
 def figure3(k):
-    """Keyframe error given vs refitted, by rater group: boxes (5th-95th whiskers), threshold lines."""
+    """Keyframe error given vs refitted, by rater group (5-frame spacing, each keyframe once): every bone-keyframe
+    as a jittered point, with a box (IQR, median; whiskers 5th-95th percentile) on top. Threshold lines dashed."""
     ps.apply()
-    fig, ax = plt.subplots(1, 2, figsize=(ps.DOUBLE * 0.75, 2.6))
+    k = k[k.spacing == KF_SPACING]
+    rng = np.random.default_rng(0)
+    fig, ax = plt.subplots(1, 2, figsize=(ps.DOUBLE * 0.8, 2.8))
     for a, col, th, yl in ((ax[0], 'rot_deg', TH_ROT, 'Helical rotation error (°)'), (ax[1], 'hel_mm', TH_TR, 'Helical translation error (mm)')):
         for i, (lv, lab) in enumerate(GROUPS[1:], start=1):
             for j, kind in enumerate(('given', 'corrected')):
                 v = k[(k.level == lv) & (k.kind == kind)][col].values
                 pos = 3 * (i - 1) + j
+                xj = pos + rng.uniform(-0.3, 0.3, len(v))
+                a.scatter(xj, v, s=1.5, marker=ps.marker(i), linewidths=0,
+                          color=ps.color(i), alpha=0.25 if kind == 'given' else 0.45, zorder=1, rasterized=True)
                 bp = a.boxplot([v], positions=[pos], widths=0.7, whis=(5, 95), showfliers=False, patch_artist=True,
-                               medianprops=dict(color='black' if kind == 'corrected' else ps.color(i), lw=1.2),
-                               whiskerprops=dict(color=ps.color(i), lw=0.9), capprops=dict(color=ps.color(i), lw=0.9))
-                bp['boxes'][0].set(facecolor=ps.color(i) if kind == 'corrected' else 'white', edgecolor=ps.color(i), lw=1.0)
-        a.axhline(th, color='0.6', ls='--', lw=0.8)
-        a.set_xticks([0.5, 3.5, 6.5], [l for _, l in GROUPS[1:]]); a.set_ylabel(yl); a.set_xlim(-0.8, 7.8)
-        a.set_ylim(0, None)
-    from matplotlib.patches import Patch
-    fig.legend([Patch(facecolor='white', edgecolor='0.3'), Patch(facecolor='0.3', edgecolor='0.3')],
-               ['Given by rater', 'After refitting'], loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.02))
+                               medianprops=dict(color='black', lw=1.3), whiskerprops=dict(color='black', lw=0.9),
+                               capprops=dict(color='black', lw=0.9), zorder=2)
+                bp['boxes'][0].set(facecolor='none', edgecolor='black', lw=1.0, ls='--' if kind == 'given' else '-')
+        a.axhline(th, color='0.5', ls=':', lw=0.9, zorder=0)
+        a.set_xticks([0, 1, 3, 4, 6, 7], ['Given', 'Refit'] * 3, fontsize=7)
+        for i, (_, lab) in enumerate(GROUPS[1:]):
+            a.text(3 * i + 0.5, -0.11, lab, transform=a.get_xaxis_transform(), ha='center', va='top', fontsize=9, fontweight='bold')
+        a.set_ylabel(yl); a.set_xlim(-0.8, 7.8); a.set_ylim(0, None)
     for a, l in zip(ax, 'ab'):
-        a.text(-0.22, 1.04, l, transform=a.transAxes, fontsize=10, fontweight='bold')
-    fig.tight_layout(rect=(0, 0.08, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure3_refitting.png')); plt.close(fig)
+        a.text(-0.2, 1.04, l, transform=a.transAxes, fontsize=10, fontweight='bold')
+    fig.tight_layout(); fig.subplots_adjust(bottom=0.17); ps.save(fig, os.path.join(OUT, 'figure3_refitting.png')); plt.close(fig)
 
 
 def checks(d, k):
