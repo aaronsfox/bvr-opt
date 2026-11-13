@@ -210,7 +210,7 @@ def figure_aim1(d):
             if j == 0:
                 a.set_ylabel(bl, fontsize=10)
             if i == len(AIM1_ROWS) - 1:
-                a.set_xticks(x, SPL); a.set_xlabel('Keyframe Spacing (frames)', fontsize=9)
+                a.set_xticks(x, SPL); a.set_xlabel('Keyframe Spacing', fontsize=9)
     from matplotlib.lines import Line2D
     fig.legend([Line2D([], [], color=ps.color(c), lw=1.6) for _, _, c in AIM1_ARMS], [l for l, _, _ in AIM1_ARMS],
                loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.005), fontsize=9)
