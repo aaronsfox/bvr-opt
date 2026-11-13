@@ -189,13 +189,13 @@ def figure_aim1(d):
     x = keyframe spacing; colour = image refinement vs spline interpolation. Shared y-axis down each column."""
     ps.apply()
     e0 = d[d.level == 'ideal']
-    cols = [('hel_mm', 'Helical Translation Error (mm)', TH_TR, (0.005, 50)),
-            ('rot_deg', 'Helical Rotation Error (°)', TH_ROT, (0.01, 30))]
+    cols = [('hel_mm', 'Helical Translation Error (mm)', TH_TR, (0.001, 50), [0.001, 0.01, 0.1, 1, 10, 50]),
+            ('rot_deg', 'Helical Rotation Error (°)', TH_ROT, (0.01, 30), [0.01, 0.1, 1, 10, 30])]
     fig, ax = plt.subplots(len(AIM1_ROWS), 2, figsize=(ps.DOUBLE, 8.4), sharex=True, sharey='col')
     x = np.arange(len(SP)); w = 0.36
     for i, (b, bl) in enumerate(AIM1_ROWS):
         eb = e0 if b is None else e0[e0.item == b]
-        for j, (col, title, th, lim) in enumerate(cols):
+        for j, (col, title, th, lim, ticks) in enumerate(cols):
             a = ax[i, j]
             for k, (lab, arm, ci) in enumerate(AIM1_ARMS):
                 ea = eb[eb.arm == arm]; c = ps.color(ci)
@@ -204,7 +204,10 @@ def figure_aim1(d):
                                medianprops=dict(color=c, lw=1.6), whiskerprops=dict(color=c, lw=1.0),
                                capprops=dict(color=c, lw=1.0), boxprops=dict(edgecolor=c, facecolor='none', lw=1.2))
             a.axhline(th, color='0.5', ls='--', lw=0.8, zorder=0)
-            a.set_yscale('log'); a.set_ylim(*lim); ps.plain_log(a, subs=(1,))
+            from matplotlib.ticker import FixedLocator, FuncFormatter, NullFormatter
+            a.set_yscale('log'); a.set_ylim(*lim)
+            a.yaxis.set_major_locator(FixedLocator(ticks)); a.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
+            a.yaxis.set_minor_formatter(NullFormatter())
             if i == 0:
                 a.set_title(title, fontsize=10)
             if j == 0:
@@ -236,7 +239,7 @@ def table_aim1(d):
                 for lab, arm, _ in AIM1_ARMS:
                     v = eb[(eb.arm == arm) & (eb.spacing == s_)][col].values
                     lo, hi = boot_median_frames(v, rng)
-                    r[f'{q}: {lab}'] = f'{np.median(v):.2f} ({lo:.2f}–{hi:.2f})'
+                    r[f'{q}: {lab}'] = f'{np.median(v):.2f} ({lo:.2f}–{hi:.2f}) [{np.percentile(v, 95):.2f}]'
             for lab, arm, _ in AIM1_ARMS:
                 r[f'Needs Correction (%): {lab}'] = f'{100 * eb[(eb.arm == arm) & (eb.spacing == s_)].bad.mean():.1f}'
             rows.append(r)
@@ -246,7 +249,7 @@ def table_aim1(d):
         T.to_excel(os.path.join(OUT, 'table_aim1.xlsx'), index=False)
     except Exception as ex:
         print('xlsx skipped:', ex)
-    note = ('Tracking error between keyframes with reference (marker-based) keyframes: median (95% CI) helical '
+    note = ('Tracking error between keyframes with reference (marker-based) keyframes: median (95% CI) [95th percentile] helical '
             'translation and rotation error, and the percentage of frames needing correction (rotation > 2° or '
             'translation > 1 mm; Welte et al., 2022), for image refinement and spline interpolation. Every scored '
             'frame of the four trials contributes one value per bone. CIs: percentile bootstrap of the median over '
