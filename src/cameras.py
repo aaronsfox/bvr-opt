@@ -14,6 +14,9 @@ import numpy as np
 class MayaCam2:
     def __init__(self, path):
         lines = [l.strip() for l in open(path)]
+        if 'image size' not in lines or 'camera matrix' not in lines:
+            raise ValueError(f'{path}: not a MayaCam 2.0 calibration (only MayaCam 2.0 is implemented; '
+                             'convert MayaCam 1.0 / DLT calibrations, e.g. by re-exporting from XMALab)')
         def block(name, n):
             i = lines.index(name)
             return [[float(v) for v in lines[i + 1 + k].split(',')] for k in range(n)]

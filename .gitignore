@@ -8,3 +8,6 @@ rg-score-*.out
 rg-kc-step-test-*.out
 
 datasets/UNC/
+
+# General tracking outputs: may hold participant data (ask Aaron before committing tracked .tra files)
+results/general_tracking/

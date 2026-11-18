@@ -1,0 +1,15 @@
+# General tracking: method settings (see README.md). The trial, keyframe tracking and spacing are given on the
+# command line; nothing here is dataset-specific.
+
+# Keyframe-anchored image refinement (the paper method; settings as in keyframe_gaps/config.yaml arm
+# new_opt_stepwise_kc). Keyframe correction (each keyframe re-fitted to the images of frames k-2..k+2, moving
+# at most tol mm / deg), then stepwise chains from each keyframe into the gap, blended, then the whole-gap
+# sine-series refinement. tol 1.5 mm / 2 deg: about the 95th percentile of a trained rater's keyframe error.
+optimisation: {cofit: true, w_drr: 1.0, w_f2f: 2.0, lam: 0.003, mu: 0.01, d_min: -2.0,
+               K_per_10: 3, batch_per_10: 4, res: [256, 512], iters: [40, 50], lrs: [0.3, 0.1],
+               step_res: [256, 512], step_iters: [20, 20], step_lrs: [0.2, 0.05],
+               keyframe_correction: {tol: [1.5, 2.0], window: 2, key_w: 0.01, res: [256, 512],
+                                     iters: [40, 50], lrs: [0.3, 0.1], step: mm}}
+
+# Spline through the same (uncorrected) keyframes: cubic pivot spline + rotation spline
+spline: spline

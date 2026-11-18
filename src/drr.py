@@ -18,8 +18,12 @@ from .device import dev
 
 
 class Bone:
-    def __init__(self, path, voxel, name=None, cutoff_frac=0.0, margin=2):
+    def __init__(self, path, voxel, name=None, cutoff_frac=0.0, margin=2, flip=(0, 0, 0)):
         v = tifffile.imread(path)
+        # Autoscoper VolumeFlip x y z: reverse the voxel order along columns, rows, slices. Not yet checked
+        # against Autoscoper on a flipped dataset (Welte's are all 0 0 0): confirm with an overlay check.
+        for ax, f in zip((2, 1, 0), flip):
+            if f: v = np.flip(v, ax)
         self.name = name
         self.D0, self.H0, self.W0 = v.shape              # full volume dims define the local frame
         self.sx, self.sy, self.sz = voxel
