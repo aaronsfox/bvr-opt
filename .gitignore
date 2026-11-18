@@ -6,3 +6,5 @@ mc-setup-*.out
 kg-score-*.out
 rg-score-*.out
 rg-kc-step-test-*.out
+
+datasets/UNC/
