@@ -10,6 +10,7 @@ export PYTHONUNBUFFERED=1
 mkdir -p "$BVR_RESULTS/logs"
 # Arguments for run.py (optional values are colon-separated: sbatch --export splits at commas)
 ARGS=(--cfg "$CFG" --tra "$TRA" --spacing "${SPACING//:/,}")
-[ -n "${BONES:-}" ] && ARGS+=(--bones "$BONES")
-[ -n "${KC_TOL:-}" ] && ARGS+=(--kc-tol "$KC_TOL")
-[ -n "${VIE:-}" ] && ARGS+=(--vie "$VIE")
+# (if-blocks, not `[ ] && ...`: a false test as the last command would make `source` fail under set -e)
+if [ -n "${BONES:-}" ]; then ARGS+=(--bones "$BONES"); fi
+if [ -n "${KC_TOL:-}" ]; then ARGS+=(--kc-tol "$KC_TOL"); fi
+if [ -n "${VIE:-}" ]; then ARGS+=(--vie "$VIE"); fi
