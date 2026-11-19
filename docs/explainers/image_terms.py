@@ -126,6 +126,38 @@ def fig_comparison(T, v, cam, frame, poses, fov, bone='tal'):
     fig.tight_layout(); ps.save(fig, os.path.join(OUT, 'fig2_comparison.png'), pdf=False); plt.close(fig)
 
 
+def fig_bone_overlay(T, v, cam, frame, poses, fov, bone='cal'):
+    """One bone isolated: radiograph edges (green), that bone's DRR edges rendered alone (red) and the overlay
+    (yellow = both), inside the bone's scoring mask, at the reference pose and moved 2 mm and 3 deg. The score in
+    the titles is the term the tracking uses (DRR of all bones rendered together, this bone's mask)."""
+    wrong = dict(poses); wrong[bone] = perturb(T, bone, poses[bone], rot=(0, 0, 3), trans=(2, 0, 0))
+    lo0, hi0 = v.roi(T.bones[bone], *rt(poses[bone]))
+    lo1, hi1 = v.roi(T.bones[bone], *rt(wrong[bone]))
+    pad = 8 * v.px
+    lo = np.maximum(np.minimum(lo0, lo1) - pad, 0); hi = np.minimum(np.maximum(hi0, hi1) + pad, [v.cam.W, v.cam.H])
+    rays = v._rays(lo, hi)
+    rad = blur(rad_crop(T, v, cam, frame, lo, hi), 1.0); rx, ry = sobel_xy(rad); mag_r = torch.sqrt(rx ** 2 + ry ** 2)
+    fm = sample_mask(v, fov, lo, hi).double()
+    fig, ax = plt.subplots(2, 3, figsize=(ps.DOUBLE, 5.0))
+    for i, (pp, lab) in enumerate(((poses, 'Reference pose'), (wrong, f'{NAME[bone]} moved 2 mm and 3°'))):
+        own = v.render_parts([(T.bones[bone], *rt(pp[bone]))], lo, hi, rays)[0]
+        d = blur(torch.clamp(own, 0, 1), 1.0); dx, dy = sobel_xy(d); mag_d = torch.sqrt(dx ** 2 + dy ** 2)
+        m = (F.max_pool2d((own > 0).float()[None, None], 7, 1, 3)[0, 0].double() * fm) > 0
+        g = (mag_r / torch.quantile(mag_r[m], 0.98)).clamp(0, 1) * m
+        r = (mag_d / torch.quantile(mag_d[m], 0.98)).clamp(0, 1) * m
+        _, _, _, _, cost = agreement(T, v, cam, frame, pp, fov, bone)
+        z = torch.zeros_like(g)
+        for j, (img, t) in enumerate(((torch.stack([z, g, z * 0], -1), 'Radiograph edges'),
+                                      (torch.stack([r, z, z], -1), f'{NAME[bone]} DRR edges'),
+                                      (torch.stack([r, g, z], -1), 'Overlay (yellow = both)'))):
+            show(ax[i, j], img.clamp(0, 1).cpu().numpy(), t)
+            ax[i, j].set_facecolor('black')
+        ax[i, 0].text(-0.06, 0.5, lab, rotation=90, transform=ax[i, 0].transAxes, va='center', ha='right', fontsize=9,
+                      fontweight='bold')
+        ax[i, 2].set_xlabel(f'1 − GC = {cost:.3f}', fontsize=8)
+    fig.tight_layout(); ps.save(fig, os.path.join(OUT, f'fig2b_{bone}_overlay.png'), pdf=False); plt.close(fig)
+
+
 def fig_landscape(T, frame, poses, fovs, bone='tal'):
     """Image term (both cameras, the moved bone's terms only) as one bone is moved off its reference pose."""
     ps.apply()
@@ -199,6 +231,7 @@ def main():
     with torch.no_grad():
         fig_processing(T, v, a.cam, a.frame, poses, fovs[a.cam])
         fig_comparison(T, v, a.cam, a.frame, poses, fovs[a.cam])
+        fig_bone_overlay(T, v, a.cam, a.frame, poses, fovs[a.cam], 'cal')
         fig_f2f(T, a.cam, a.frame, poses, nxt, fovs)
     fig_landscape(T, a.frame, poses, fovs)
     print('written to', OUT)
