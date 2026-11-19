@@ -13,19 +13,20 @@ cd "$(dirname "$0")/../.."
 LOGS=results/general_tracking/$(basename "$CFG" .cfg)/logs; mkdir -p "$LOGS"
 GPU=(--partition=dgx --gres=gpu:1 --cpus-per-task=16 --mem=64G)
 EXP="ALL,CFG=$CFG,TRA=$TRA,SPACING=${3},BONES=${BONES:-},KC_TOL=${KC_TOL:-},VIE=${VIE:-}"
-TAG=$(basename "$CFG" .cfg)-s${3}
+SP=${3//:/-}   # spacings as they appear in job and log names: no colons (Windows cannot open them)
+TAG=$(basename "$CFG" .cfg)-s$SP
 DEP=()
 if [ "${KC_TOL:-}" != "0:0" ]; then
   JID=$(sbatch --parsable "${GPU[@]}" --array=0-0 --time="$TIME" --job-name="gt-$TAG-keys" \
-    --output="$LOGS/slurm-s${3}-keys-%A_%a.out" \
+    --output="$LOGS/slurm-s$SP-keys-%A_%a.out" \
     --export="$EXP,STAGE=keys,WORKERS=1,BVR_DEVICE=cuda" general_tracking/slurm/array.sbatch)
   echo "Submitted keyframe correction: $JID"; DEP=(--dependency=afterok:$JID)
 fi
 JID=$(sbatch --parsable "${GPU[@]}" "${DEP[@]}" --array=0-0 --time="$TIME" --job-name="gt-$TAG-gaps" \
-  --output="$LOGS/slurm-s${3}-gaps-%A_%a.out" \
+  --output="$LOGS/slurm-s$SP-gaps-%A_%a.out" \
   --export="$EXP,STAGE=gaps,WORKERS=$WORKERS,BVR_DEVICE=cuda" general_tracking/slurm/array.sbatch)
 echo "Submitted gaps: $JID"
 JID=$(sbatch --parsable --partition=normal --cpus-per-task=2 --mem=16G --time=01:00:00 --dependency=afterok:$JID \
-  --job-name="gt-$TAG-assemble" --output="$LOGS/slurm-s${3}-assemble-%j.out" \
+  --job-name="gt-$TAG-assemble" --output="$LOGS/slurm-s$SP-assemble-%j.out" \
   --export="$EXP" general_tracking/slurm/assemble.sbatch)
 echo "Submitted assemble: $JID"
