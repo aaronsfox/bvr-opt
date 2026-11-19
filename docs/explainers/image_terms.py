@@ -218,6 +218,73 @@ def fig_f2f(T, cam, frame, poses_f, poses_g, fovs, bone='tal'):
     fig.tight_layout(); ps.save(fig, os.path.join(OUT, 'fig4_frame_to_frame.png'), pdf=False); plt.close(fig)
 
 
+def fig_f2f_drr(T, cam, frame, poses_f, poses_g, fovs, bone='tal'):
+    """How the frame-to-frame term relates to the DRR. Rows: frame f at its pose; frame f+1 at its pose; frame f+1
+    with the pose 2 mm and 3 deg off. Columns: radiograph edges (green) with the bone's DRR edges (red; the DRR is
+    not used by the term, but the CT edge points sit on its edges); the CT edge points coloured by the radiograph
+    x-gradient sampled under each (what the term reads); and a scatter of those values against frame f's, whose
+    correlation is the term (cost = 1 - mean NCC of x and y). Full image resolution, so points, DRR and image share
+    one pixel grid."""
+    f2f = F2F(T, [frame, frame + 1], fovs)
+    v = View(T.cams[cam], T.cams[cam].W, T.sample_distance, T.ray_intensity)       # render at image resolution
+    P = T.bones[bone].surface_points(2500, 0.6, seed=0)
+    pts = lambda M: torch.tensor(P @ M[:3, :3].T + M[:3, 3])
+    wrong = perturb(T, bone, poses_g[bone], rot=(0, 0, 3), trans=(2, 0, 0))
+    rows = [(frame, poses_f[bone], f'Frame {frame}'), (frame + 1, poses_g[bone], f'Frame {frame + 1}, its pose'),
+            (frame + 1, wrong, f'Frame {frame + 1}, pose 2 mm, 3\u00b0 off')]
+    piv = T.bones[bone].pivot
+    move = np.linalg.norm((poses_g[bone][:3, :3] @ piv + poses_g[bone][:3, 3]) - (poses_f[bone][:3, :3] @ piv + poses_f[bone][:3, 3]))
+    rois = [v.roi(T.bones[bone], *rt(M)) for _, M, _ in rows]
+    lo = np.maximum(np.min([r[0] for r in rois], 0) - 30, 0); hi = np.minimum(np.max([r[1] for r in rois], 0) + 30, [v.cam.W, v.cam.H])
+    lo, hi = lo.astype(int), hi.astype(int)
+    rays = v._rays(lo, hi)
+    fig = plt.figure(figsize=(ps.DOUBLE, 7.4))
+    gs = fig.add_gridspec(3, 3, width_ratios=[1, 1, 0.9])
+    vals = []
+    for i, (f, M, lab) in enumerate(rows):
+        G = f2f.G[(f, cam)][0].cpu().numpy()
+        c0, r0, c1, r1 = f2f.crop[cam]
+        gx, gy = G[0][lo[1] - r0:hi[1] - r0, lo[0] - c0:hi[0] - c0], G[1][lo[1] - r0:hi[1] - r0, lo[0] - c0:hi[0] - c0]
+        mag_r = np.hypot(gx, gy)
+        drr = v.render_parts([(T.bones[bone], *rt(M))], lo, hi, rays)[0]
+        dx, dy = sobel_xy(blur(torch.clamp(drr, 0, 1), 2.0)); mag_d = torch.sqrt(dx ** 2 + dy ** 2).cpu().numpy()
+        h, w = min(mag_r.shape[0], mag_d.shape[0]), min(mag_r.shape[1], mag_d.shape[1])
+        rgb = np.zeros((h, w, 3))
+        rgb[..., 1] = np.clip(mag_r[:h, :w] / np.percentile(mag_r, 99), 0, 1)
+        rgb[..., 0] = np.clip(mag_d[:h, :w] / np.percentile(mag_d[mag_d > 0], 98), 0, 1)
+        a = fig.add_subplot(gs[i, 0]); show(a, rgb, 'X-ray edges (green), DRR edges (red)' if i == 0 else '')
+        a.text(-0.04, 0.5, lab, rotation=90, transform=a.transAxes, ha='right', va='center', fontsize=9, fontweight='bold')
+        u, vv = f2f.project(cam, pts(M)); val, _ = f2f.sample(f, cam, u, vv); vals.append(val)
+        a2 = fig.add_subplot(gs[i, 1])
+        s_ = np.percentile(np.abs(gx), 99.5)
+        a2.imshow(gx[:h, :w], cmap='gray', vmin=-s_, vmax=s_)
+        sv = np.percentile(np.abs(vals[0][0].numpy()), 97)                 # one colour scale for all rows
+        a2.scatter(u.numpy()[::4] - 0.5 - lo[0], vv.numpy()[::4] - 0.5 - lo[1], s=3, c=val[0].numpy()[::4], cmap='RdBu_r',
+                   vmin=-sv, vmax=sv, linewidths=0)
+        a2.set_xlim(0, w); a2.set_ylim(h, 0); a2.set_xticks([]); a2.set_yticks([])
+        for sp_ in a2.spines.values():
+            sp_.set_visible(False)
+        if i == 0:
+            a2.set_title('CT edge points on X-ray x-gradient\n(colour = value sampled under each point)', fontsize=8)
+    ncc = lambda x, y: float(F2F._ncc(x, y))
+    for i, k in ((1, 1), (2, 2)):
+        a3 = fig.add_subplot(gs[i, 2])
+        x0, x1 = vals[0][0].numpy(), vals[k][0].numpy()
+        a3.scatter(x0, x1, s=2, color=ps.color(0 if k == 1 else 3), alpha=0.4, linewidths=0, marker='o')
+        lim = np.percentile(np.abs(np.r_[x0, x1]), 99); a3.set_xlim(-lim, lim); a3.set_ylim(-lim, lim)
+        a3.plot([-lim, lim], [-lim, lim], color='0.5', lw=0.8, ls='--', marker='')
+        nx = ncc(vals[0][0], vals[k][0]); ny = ncc(vals[0][1], vals[k][1])
+        a3.set_title(f'NCC x {nx:.2f}, y {ny:.2f}\ncost = 1 \u2212 mean = {1 - (nx + ny) / 2:.2f}', fontsize=8)
+        a3.set_xlabel(f'x-gradient at point, frame {frame}', fontsize=7); a3.set_ylabel(f'frame {frame + 1}', fontsize=7)
+        a3.tick_params(labelsize=6)
+    a0 = fig.add_subplot(gs[0, 2]); a0.axis('off')
+    a0.text(0, 0.95, f'{NAME[bone]}, camera {cam + 1}.\nReference motion f \u2192 f+1:\npivot moves {move:.1f} mm.\n\n'
+            'Each CT edge point is placed\nwith each frame\'s pose and the\nX-ray gradient under it is read.\n'
+            'Right: the two frames\' values\nfor every point. On the diagonal\n= the same anatomy landed on\nthe same edge in both frames.',
+            va='top', fontsize=7.5)
+    fig.tight_layout(); ps.save(fig, os.path.join(OUT, 'fig5_f2f_with_drr.png'), pdf=False); plt.close(fig)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--trial', default='T0014_hop108_0001'); ap.add_argument('--frame', type=int, default=35)
@@ -233,6 +300,7 @@ def main():
         fig_comparison(T, v, a.cam, a.frame, poses, fovs[a.cam])
         fig_bone_overlay(T, v, a.cam, a.frame, poses, fovs[a.cam], 'cal')
         fig_f2f(T, a.cam, a.frame, poses, nxt, fovs)
+        fig_f2f_drr(T, a.cam, a.frame, poses, nxt, fovs)
     fig_landscape(T, a.frame, poses, fovs)
     print('written to', OUT)
 
