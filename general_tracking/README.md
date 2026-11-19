@@ -19,7 +19,8 @@ separate step on the `.tra` files.
     <CameraRootDir>/*.tif   one image per frame per camera, sorted by file name; 8- or 16-bit
     <VolumeFile>.tif        one segmented CT volume per bone; the bone is named after the file
                             (Femur.tif -> Femur); VolumeFlip is applied
-    xParameters/*.vie       optional renderer settings (Welte's are used if absent, with a warning)
+    xParameters/control_settings.vie   renderer settings, as Autoscoper looks for them (Welte defaults if
+                                       absent; each job log names the file used)
 <keyframe folder>/*.tra     one per bone, named after it (Femur_keys.tra), as Autoscoper writes them:
                             one line per frame, NaN on frames without a keyframe
 ```

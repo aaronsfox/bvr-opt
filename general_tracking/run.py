@@ -105,6 +105,8 @@ def setup(args):
     out = os.path.abspath(args.out or os.environ.get('BVR_RESULTS') or
                           os.path.join(ROOT, 'results', 'general_tracking', T.name))
     S.update(T=T, bones=bones, tra=tra, given=given, tol=tol, out=out, cfg=cfg)
+    log(f'renderer settings: {T.vie_path or "NOT FOUND (no xParameters/control_settings.vie next to the .cfg): "
+                                            "using Welte defaults"} {T.vie["renderer"]}')
     return T
 
 
