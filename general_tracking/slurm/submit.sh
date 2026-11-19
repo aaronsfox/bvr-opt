@@ -2,8 +2,8 @@
 # Track one trial at one or more keyframe spacings on the GPU: keyframe correction, then the gaps, then the
 # optimised and spline .tra files are written (each job starts when the one before has succeeded).
 #   bash general_tracking/slurm/submit.sh CFG TRA SPACING [WORKERS] [TIME]
-# e.g. bash general_tracking/slurm/submit.sh datasets/UNC/Sub05/Sub05_Walk1550.cfg \
-#        datasets/UNC/Sub05/Test_Tracking 10
+# e.g. bash general_tracking/slurm/submit.sh datasets/UNC/Sub05_Walk1550.cfg \
+#        datasets/UNC/Test_Tracking 10
 #      SPACING: N, full or all; several as N:N:... (e.g. 5:10:20:full). CFG and TRA must not contain commas.
 # Optional, as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2 (0:0 = no keyframe correction)  VIE=file.vie
 # Finished work is skipped, so resubmitting the same command resumes.

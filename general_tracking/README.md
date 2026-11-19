@@ -35,10 +35,11 @@ separate step on the `.tra` files.
 
 ## Running
 
-From the repo root, with the dataset under `datasets/UNC/` (git-ignored):
+From the repo root, with the trial folder at `datasets/UNC/` (git-ignored; the .cfg, its data folders and
+Test_Tracking/ sit directly in it):
 
 ```bash
-C=datasets/UNC/Sub05/Sub05_Walk1550.cfg; K=datasets/UNC/Sub05/Test_Tracking
+C=datasets/UNC/Sub05_Walk1550.cfg; K=datasets/UNC/Test_Tracking
 
 # Which keyframes each spacing uses (seconds, CPU)
 BVR_DEVICE=cpu python general_tracking/run.py keys --cfg $C --tra $K --spacing 5,10,20,full,all
