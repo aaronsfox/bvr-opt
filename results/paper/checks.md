@@ -1,6 +1,6 @@
 # Checks for the results text
 
-Share of refinement frames needing correction (Welte criterion) that lie in a track (rater, trial, bone, spacing) with at least one refitted keyframe still beyond the criterion.
+Share of registration frames needing correction (Welte criterion) that lie in a track (rater, trial, bone, spacing) with at least one refitted keyframe still beyond the criterion.
 
 | Rater group | 5 | 10 | 20 | 30 | 40 | Trial |
 |---|---|---|---|---|---|---|
@@ -8,7 +8,7 @@ Share of refinement frames needing correction (Welte criterion) that lie in a tr
 | 2x | 100% (n=5) | 100% (n=14) | 20% (n=126) | 28% (n=150) | 57% (n=253) | 47% (n=353) |
 | 4x | 100% (n=341) | 99% (n=317) | 73% (n=501) | 69% (n=483) | 79% (n=703) | 73% (n=872) |
 
-Frames needing correction by bone, refinement, pooled over spacings (%):
+Frames needing correction by bone, registration, pooled over spacings (%):
 
 |   level |   tib |   tal |   cal |
 |--------:|------:|------:|------:|

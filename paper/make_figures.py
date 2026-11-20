@@ -56,7 +56,7 @@ def boot_ci(e, col, rng):
 def summarise(d):
     rng = np.random.default_rng(2022); rows = []
     for lv, lab in GROUPS:
-        for meth, arm in (('Refinement', METHOD[lv]), ('Interpolation', INTERP)):
+        for meth, arm in (('Registration', METHOD[lv]), ('Interpolation', INTERP)):
             for s, sl in zip(SP, SPL):
                 e = d[(d.level == lv) & (d.arm == arm) & (d.spacing == s)]
                 r = dict(group=lab, method=meth, spacing=sl, n=len(e))
@@ -76,11 +76,11 @@ def cell(r, q, nd=2):
 def table1(t):
     rows = []
     for (g, s), x in t.groupby(['group', 'spacing'], sort=False):
-        a = x[x.method == 'Refinement'].iloc[0]; b = x[x.method == 'Interpolation'].iloc[0]
+        a = x[x.method == 'Registration'].iloc[0]; b = x[x.method == 'Interpolation'].iloc[0]
         rows.append({'Keyframes': g, 'Spacing (frames)': s,
-                     'Rotation (°): refinement': cell(a, 'rot'), 'Rotation (°): interpolation': cell(b, 'rot'),
-                     'Translation (mm): refinement': cell(a, 'tr'), 'Translation (mm): interpolation': cell(b, 'tr'),
-                     'Needs correction (%): refinement': f'{a.needs_pct:.1f}', 'Needs correction (%): interpolation': f'{b.needs_pct:.1f}'})
+                     'Rotation (°): registration': cell(a, 'rot'), 'Rotation (°): interpolation': cell(b, 'rot'),
+                     'Translation (mm): registration': cell(a, 'tr'), 'Translation (mm): interpolation': cell(b, 'tr'),
+                     'Needs correction (%): registration': f'{a.needs_pct:.1f}', 'Needs correction (%): interpolation': f'{b.needs_pct:.1f}'})
     T = pd.DataFrame(rows)
     T.to_csv(os.path.join(OUT, 'table1.csv'), index=False)
     try:
@@ -91,7 +91,7 @@ def table1(t):
             'of helical rotation and of translation along the helical axis, and the percentage of bone-frames needing '
             'correction (rotation > 2° or translation > 1 mm; Welte et al., 2022). Bones, frames, trials and raters pooled; '
             'CIs bootstrapped over the 10 raters (none for reference keyframes). "Trial" = keyframes at the first and last '
-            'tracked frames only. Refinement with reference keyframes omits keyframe refitting.')
+            'tracked frames only. Registration with reference keyframes omits keyframe refitting.')
     with open(os.path.join(OUT, 'table1.md'), 'w') as fh:
         fh.write(note + '\n\n' + T.to_markdown(index=False) + '\n')
     return T
@@ -99,12 +99,12 @@ def table1(t):
 
 def figure2(t):
     """Needs correction, median rotation and median translation against spacing; colour/marker = keyframe source,
-    solid filled = refinement, dotted open = interpolation."""
+    solid filled = registration, dotted open = interpolation."""
     ps.apply()
     fig, ax = plt.subplots(1, 3, figsize=(ps.DOUBLE, 2.7))
     x = np.arange(len(SP))
     for i, (_, lab) in enumerate(GROUPS):
-        for meth in ('Interpolation', 'Refinement'):
+        for meth in ('Interpolation', 'Registration'):
             e = t[(t.group == lab) & (t.method == meth)].set_index('spacing').loc[SPL]
             interp = meth == 'Interpolation'
             kw = dict(ls=':' if interp else '-', lw=1.2 if interp else 1.6, **ps.style(i, hollow=interp))
@@ -122,7 +122,7 @@ def figure2(t):
         a.set_xticks(x, SPL); a.set_xlabel('Keyframe spacing (frames)')
         a.text(-0.2, 1.04, l, transform=a.transAxes, fontsize=10, fontweight='bold')
     h, lab = ax[0].get_legend_handles_labels()
-    order = [k for k in range(len(h)) if 'refinement' in lab[k]] + [k for k in range(len(h)) if 'interpolation' in lab[k]]
+    order = [k for k in range(len(h)) if 'registration' in lab[k]] + [k for k in range(len(h)) if 'interpolation' in lab[k]]
     fig.legend([h[k] for k in order], [lab[k] for k in order], loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.02))
     fig.tight_layout(rect=(0, 0.16, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure2_spacing.png')); plt.close(fig)
 
@@ -179,7 +179,7 @@ def figure3(k):
     fig.tight_layout(); fig.subplots_adjust(bottom=0.17); ps.save(fig, os.path.join(OUT, 'figure3_refitting.png')); plt.close(fig)
 
 
-AIM1_ARMS = [('Image Refinement', METHOD['ideal'], 0), ('Spline Interpolation', INTERP, 1)]
+AIM1_ARMS = [('Image Registration', METHOD['ideal'], 0), ('Spline Interpolation', INTERP, 1)]
 AIM1_ROWS = [('tib', 'Tibia'), ('tal', 'Talus'), ('cal', 'Calcaneus'), (None, 'All Bones')]
 
 
@@ -188,9 +188,9 @@ ERR_COLS = [('hel_mm', 'Helical Translation Error (mm)', TH_TR, (0.001, 50), [0.
 
 
 def _box_grid(rows, fname, height):
-    """Shared layout for the error figures. rows = [(row label, frames for the row, image-refinement arm)];
+    """Shared layout for the error figures. rows = [(row label, frames for the row, image-registration arm)];
     columns = helical translation and rotation error; boxplots over every scored frame (median, IQR, whiskers to
-    1.5 IQR, outliers not drawn); x = keyframe spacing; colour = image refinement vs spline interpolation;
+    1.5 IQR, outliers not drawn); x = keyframe spacing; colour = image registration vs spline interpolation;
     shared y-axis down each column; dashed lines = Welte thresholds."""
     from matplotlib.lines import Line2D
     from matplotlib.ticker import FixedLocator, FuncFormatter, NullFormatter
@@ -198,7 +198,7 @@ def _box_grid(rows, fname, height):
     fig, ax = plt.subplots(len(rows), 2, figsize=(ps.DOUBLE, height), sharex=True, sharey='col')
     x = np.arange(len(SP)); w = 0.36
     for i, (bl, eb, ref_arm) in enumerate(rows):
-        arms = [('Image Refinement', ref_arm, 0), ('Spline Interpolation', INTERP, 1)]
+        arms = [('Image Registration', ref_arm, 0), ('Spline Interpolation', INTERP, 1)]
         for j, (col, title, th, lim, ticks) in enumerate(ERR_COLS):
             a = ax[i, j]
             for k, (lab, arm, ci) in enumerate(arms):
@@ -217,7 +217,7 @@ def _box_grid(rows, fname, height):
                 a.set_ylabel(bl, fontsize=10)
             if i == len(rows) - 1:
                 a.set_xticks(x, SPL); a.set_xlabel('Keyframe Spacing', fontsize=9)
-    fig.legend([Line2D([], [], color=ps.color(c), lw=1.6) for c in (0, 1)], ['Image Refinement', 'Spline Interpolation'],
+    fig.legend([Line2D([], [], color=ps.color(c), lw=1.6) for c in (0, 1)], ['Image Registration', 'Spline Interpolation'],
                loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.005), fontsize=9)
     fig.tight_layout(rect=(0, 0.03 * 4 / len(rows), 1, 1)); ps.save(fig, os.path.join(OUT, fname)); plt.close(fig)
 
@@ -240,7 +240,7 @@ RATER_GROUPS = [('1', '1x Raters', 2), ('2', '2x Raters', 3), ('4', '4x Raters',
 
 def figure_aim2(d):
     """Aim 2 (simulated raters), landscape: rows = tibia, talus, calcaneus, all bones; columns = helical translation
-    and rotation error. At each spacing, six boxes: image refinement for 1x, 2x, 4x raters (filled), then spline
+    and rotation error. At each spacing, six boxes: image registration for 1x, 2x, 4x raters (filled), then spline
     interpolation for the same (open). Colour = rater group. Boxes as in aim 1 (median, IQR, whiskers 1.5 IQR,
     outliers not drawn); shared y-axis down each column; dashed lines = Welte thresholds."""
     from matplotlib.patches import Patch
@@ -279,7 +279,7 @@ def figure_aim2(d):
             a.set_xlim(-0.55, len(SP) - 0.45)
     handles = [Patch(facecolor=ps.color(ci), edgecolor=ps.color(ci)) for _, _, ci in RATER_GROUPS] + \
               [Patch(facecolor='black', edgecolor='black'), Patch(facecolor='none', edgecolor='black')]
-    labels = [lab for _, lab, _ in RATER_GROUPS] + ['Image Refinement (Filled)', 'Spline Interpolation (Open)']
+    labels = [lab for _, lab, _ in RATER_GROUPS] + ['Image Registration (Filled)', 'Spline Interpolation (Open)']
     fig.legend(handles, labels, loc='lower center', ncol=5, bbox_to_anchor=(0.5, -0.005), fontsize=9)
     fig.tight_layout(rect=(0, 0.035, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure4_aim2.png')); plt.close(fig)
 
@@ -293,7 +293,7 @@ def boot_median_frames(v, rng, n=N_BOOT):
 
 def table_aim1(d):
     """Aim 1 table, structured as the figure: bone x spacing rows; median (95% CI) translation and rotation, and
-    % frames needing correction, for image refinement and spline interpolation."""
+    % frames needing correction, for image registration and spline interpolation."""
     rng = np.random.default_rng(2022); e0 = d[d.level == 'ideal']; rows = []
     for b, bl in AIM1_ROWS:
         eb = e0 if b is None else e0[e0.item == b]
@@ -315,7 +315,7 @@ def table_aim1(d):
         print('xlsx skipped:', ex)
     note = ('Tracking error between keyframes with reference (marker-based) keyframes: median [2.5th–97.5th percentile] helical '
             'translation and rotation error, and the percentage of frames needing correction (rotation > 2° or '
-            'translation > 1 mm; Welte et al., 2022), for image refinement and spline interpolation. Every scored '
+            'translation > 1 mm; Welte et al., 2022), for image registration and spline interpolation. Every scored '
             'frame of the four trials contributes one value per bone; percentiles are across frames. "Trial" = keyframes '
             'at the first and last tracked frames only.')
     with open(os.path.join(OUT, 'table_aim1.md'), 'w') as fh:
@@ -324,11 +324,11 @@ def table_aim1(d):
 
 
 def checks(d, k):
-    """Share of 4x refinement frames needing correction that lie in tracks with an unrecovered keyframe (Welte)."""
+    """Share of 4x registration frames needing correction that lie in tracks with an unrecovered keyframe (Welte)."""
     kb = k[k.kind == 'corrected'].groupby(['level', 'rater', 'spacing', 'trial', 'item']).bad.any().rename('kbad')
     m = d[d.arm == METHOD['4']].join(kb, on=['level', 'rater', 'spacing', 'trial', 'item'])
     lines = ['# Checks for the results text', '',
-             'Share of refinement frames needing correction (Welte criterion) that lie in a track (rater, trial, bone, '
+             'Share of registration frames needing correction (Welte criterion) that lie in a track (rater, trial, bone, '
              'spacing) with at least one refitted keyframe still beyond the criterion.', '',
              '| Rater group | ' + ' | '.join(SPL) + ' |', '|---|' + '---|' * len(SP)]
     for lv in ('1', '2', '4'):
@@ -337,7 +337,7 @@ def checks(d, k):
             e = m[(m.level == lv) & (m.spacing == s) & m.bad]
             vals.append(f'{100 * e.kbad.mean():.0f}% (n={len(e)})' if len(e) else '–')
         lines.append(f'| {lv}x | ' + ' | '.join(vals) + ' |')
-    lines += ['', 'Frames needing correction by bone, refinement, pooled over spacings (%):', '']
+    lines += ['', 'Frames needing correction by bone, registration, pooled over spacings (%):', '']
     b = (m.groupby(['level', 'item']).bad.mean() * 100).round(1).unstack()[BONES]
     lines.append(b.to_markdown())
     s = '\n'.join(lines) + '\n'; open(os.path.join(OUT, 'checks.md'), 'w').write(s); print(s)
