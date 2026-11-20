@@ -16,6 +16,8 @@ outputs with other tracking in a separate step.
             every bone are always keyframes; a final gap shorter than N/2 joins the one before);
             full: the first and last tracked frames only; all: every tracked frame (sparse keyframes as given)
 --kc-tol    keyframe-correction tolerance mm:deg (default config.yaml, 1.5:2); 0:0 holds keyframes as given
+--d-min, --mu  contact allowance (mm) and penalty weight; default config.yaml (-2, 0.01). Recorded in the
+            work files and keyframes.json; a results folder holding work made with other values is not reused
 --per-bone  fit each bone alone, between its own keyframes, so bones need not share keyframe frames. Bones are
             then not rendered together and contact is not checked. Results go to s<spacing>_perbone/, so they
             never overwrite (or reuse) a joint run's s<spacing>/
@@ -115,9 +117,17 @@ def setup(args):
         raise SystemExit(f'--kc-tol needs two values (mm and deg), got {args.kc_tol!r}')
     out = os.path.abspath(args.out or os.environ.get('BVR_RESULTS') or
                           os.path.join(ROOT, 'results', 'general_tracking', T.name))
+    if args.d_min is not None:
+        OPT['d_min'] = float(args.d_min)
+    if args.mu is not None:
+        if float(args.mu) < 0:
+            raise SystemExit(f'--mu must be >= 0, got {args.mu}')
+        OPT['mu'] = float(args.mu)
     S.update(T=T, bones=bones, all_bones=list(bones), tra=tra, given=given, order=order, tol=tol, out=out, cfg=cfg,
              per_bone=args.per_bone, tag=None)
     log('keyframe files: ' + ', '.join(f'{n} {os.path.basename(p)} ({order[n]}-major)' for n, p in tra.items()))
+    log(f"contact: d_min {OPT['d_min']} mm, mu {OPT['mu']}"
+        + (' (not used: bones fitted one at a time)' if args.per_bone or len(bones) == 1 else ''))
     log(f'renderer settings: {T.vie_path or "NOT FOUND (no xParameters/control_settings.vie next to the .cfg): "
                                             "using Welte defaults"} {T.vie["renderer"]}')
     return T
@@ -253,7 +263,7 @@ def correct_keyframes(spacing):
         poses, info = fit.run()
         for n in BONES: out[n][k] = poses[n]
         meta[str(k)] = info
-    return out, dict(meta=meta, tol=S['tol'], config=kc, **provenance(t0))
+    return out, dict(meta=meta, tol=S['tol'], config=kc, contact=contact(), **provenance(t0))
 
 
 def fit_gap(spacing, a, b):
@@ -291,7 +301,24 @@ def fit_gap(spacing, a, b):
     info.pop('hist', None)
     poses = {n: {str(f): track[(n, f)].tolist() for f in inner} for n in BONES}
     return dict(gap=[a, b], poses=poses, chain_disagreement=disagree, chain_sec=t_chain, K=Kb, batch=batch,
-                fit=info, config=c, **provenance(t0))
+                fit=info, config=c, contact=contact(), **provenance(t0))
+
+
+def contact():
+    return dict(d_min=OPT['d_min'], mu=OPT['mu'])
+
+
+def check_reuse(path, what):
+    """Finished work is reused; stop if it was made with other contact or keyframe-correction settings."""
+    d = json.load(open(path))
+    old = d.get('contact') or {k: d['config'][k] for k in ('d_min', 'mu') if k in d.get('config', {})}
+    now = contact()
+    diff = [f'{k} {old[k]} (now {now[k]})' for k in now if k in old and abs(float(old[k]) - now[k]) > 1e-12]
+    if 'tol' in d and [float(x) for x in d['tol']] != [float(x) for x in S['tol']]:
+        diff.append(f"keyframe-correction tolerance {d['tol']} (now {S['tol']})")
+    if diff:
+        raise SystemExit(f'{what} in {os.path.dirname(path)} was made with ' + ', '.join(diff) +
+                         '. Use a new results folder (--out / BVR_RESULTS) for these settings.')
 
 
 def save(path, d):
@@ -305,7 +332,7 @@ def stage_keys(spacing, quick):
         return
     p = keys_path(spacing)
     if os.path.exists(p) and not quick:
-        return
+        check_reuse(p, 'keyframe correction'); return
     log(f'start keyframe correction, spacing {spacing}, {"+".join(S["bones"])}: {len(keyframes(spacing))} keyframes, tol {S["tol"]}')
     kp, meta = correct_keyframes(spacing)
     if quick:
@@ -329,7 +356,7 @@ def stage_gaps(spacing, task, ntasks, quick):
         with active(bones, tag):
             p = gap_path(spacing, a, b); who = '+'.join(bones)
             if os.path.exists(p) and not quick:
-                continue
+                check_reuse(p, f'gap {a}-{b}'); continue
             log(f'start gap {a}-{b}, spacing {spacing}, {who}')
             d = fit_gap(spacing, a, b)
             if quick:
@@ -350,7 +377,8 @@ def assemble(spacing):
         for r in diag:
             fh.write(f'{r[0]},{r[1]},{r[2]},{r[3]},{r[4]:.4f},{r[5]:.4f}\n')
     head = dict(trial=S['T'].name, cfg=S['cfg'], tra=S['tra'], tra_order=S['order'], spacing=spacing,
-                per_bone=S['per_bone'], keyframe_correction_tol=S['tol'] if kc_on() else None)
+                per_bone=S['per_bone'], keyframe_correction_tol=S['tol'] if kc_on() else None,
+                contact=None if S['per_bone'] or len(S['all_bones']) == 1 else contact())
     if S['per_bone']:
         info = dict(head, bones={p['bones'][0]: {k: p[k] for k in ('keyframes', 'correction_moved', 'gaps_done',
                                                                     'gaps_total')} for p in parts})
@@ -429,6 +457,10 @@ def main():
     ap.add_argument('--task', type=int, default=0)
     ap.add_argument('--ntasks', type=int, default=1)
     ap.add_argument('--kc-tol', default=None, help='keyframe-correction tolerance mm:deg; 0:0 = no correction')
+    ap.add_argument('--d-min', type=float, default=None,
+                    help='contact allowance in mm (default config.yaml, -2): overlap allowed before the contact '
+                         'penalty starts; negative = overlap allowed, 0 = none, positive = required gap')
+    ap.add_argument('--mu', type=float, default=None, help='contact penalty weight (default config.yaml, 0.01)')
     ap.add_argument('--bones', default=None, help='subset of the .cfg volumes, comma- or colon-separated')
     ap.add_argument('--vie', default=None, help='Autoscoper renderer settings, if not found in the trial folder')
     ap.add_argument('--out', default=None, help='results folder (default results/general_tracking/<trial>)')

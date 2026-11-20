@@ -1,5 +1,7 @@
 # General tracking
 
+All options, environment variables and method settings are listed in `OPTIONS.md`.
+
 Tracks any Autoscoper trial from keyframes. You give it the trial's `.cfg`, the keyframe tracking (`.tra`, one
 per bone) and a keyframe spacing. It returns two sets of tracking as Autoscoper `.tra` files:
 
@@ -51,6 +53,7 @@ BVR_DEVICE=cpu python general_tracking/run.py keys --cfg $C --tra $K --spacing 5
 bash general_tracking/slurm/submit.sh $C $K 10              # one spacing
 bash general_tracking/slurm/submit.sh $C $K 5:10:20:full    # several (colon-separated)
 #   options as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2  VIE=file.vie  TRA_PATTERN="*_Tracking.tra"
+#   D_MIN=-1  MU=0.01  (contact allowance in mm and penalty weight)
 #   PER_BONE=1  fit each bone alone over its own keyframes (see "Bones keyed on different frames")
 #   resubmitting the same command resumes; finished work is skipped
 
@@ -96,7 +99,7 @@ Load the `.tra` files into Autoscoper to review every frame.
 - Run time on Welte: about 32 s per tracked frame with 4 runs sharing an A100.
 - The method was developed on Welte's trials, where bones move about 1.5 mm per frame. Larger steps per frame
   make long gaps harder, so keep keyframes closer together for fast motion.
-- If the segmented bones routinely overlap by more than 2 mm at the keyframe poses, make `d_min` in
-  `config.yaml` more negative.
+- If the segmented bones routinely overlap by more than 2 mm at the keyframe poses, make `d_min` more
+  negative (`--d-min` / `D_MIN`); for tight joints with thin gaps, try `-1` to `-0.5`.
 - VolumeFlip has not yet been checked against Autoscoper on a flipped dataset. Check the first outputs in
   Autoscoper.

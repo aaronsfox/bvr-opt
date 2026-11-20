@@ -8,13 +8,14 @@
 # Optional, as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2 (0:0 = no keyframe correction)  VIE=file.vie
 #   TRA_PATTERN="*_Tracking.tra" (use only matching .tra files in TRA, e.g. to skip *_Initial.tra)
 #   PER_BONE=1 (fit each bone alone over its own keyframes; results in s<spacing>_perbone/)
+#   D_MIN=-1 (contact allowance, mm; default -2)  MU=0.01 (contact penalty weight)
 # Finished work is skipped, so resubmitting the same command resumes.
 set -euo pipefail
 CFG=$1; TRA=$2; WORKERS=${4:-4}; TIME=${5:-12:00:00}
 cd "$(dirname "$0")/../.."
 LOGS=results/general_tracking/$(basename "$CFG" .cfg)/logs; mkdir -p "$LOGS"
 GPU=(--partition=dgx --gres=gpu:1 --cpus-per-task=16 --mem=64G)
-EXP="ALL,CFG=$CFG,TRA=$TRA,SPACING=${3},BONES=${BONES:-},KC_TOL=${KC_TOL:-},VIE=${VIE:-},TRA_PATTERN=${TRA_PATTERN:-},PER_BONE=${PER_BONE:-}"
+EXP="ALL,CFG=$CFG,TRA=$TRA,SPACING=${3},BONES=${BONES:-},KC_TOL=${KC_TOL:-},VIE=${VIE:-},TRA_PATTERN=${TRA_PATTERN:-},PER_BONE=${PER_BONE:-},D_MIN=${D_MIN:-},MU=${MU:-}"
 SP=${3//:/-}${PER_BONE:+_perbone}   # job and log names: no colons (Windows cannot open them)
 TAG=$(basename "$CFG" .cfg)-s$SP
 KW=1; if [ -n "${PER_BONE:-}" ]; then KW=$WORKERS; fi   # per-bone: bones' keyframe corrections in parallel
