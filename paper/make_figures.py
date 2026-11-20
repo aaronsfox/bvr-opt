@@ -278,8 +278,8 @@ def figure_aim2(d):
                 a.set_xticks(x, SPL); a.set_xlabel('Keyframe Spacing', fontsize=9)
             a.set_xlim(-0.55, len(SP) - 0.45)
     handles = [Patch(facecolor=ps.color(ci), edgecolor=ps.color(ci)) for _, _, ci in RATER_GROUPS] + \
-              [Patch(facecolor='0.35', edgecolor='0.35'), Patch(facecolor='none', edgecolor='0.35')]
-    labels = [lab for _, lab, _ in RATER_GROUPS] + ['Image Refinement (filled)', 'Spline Interpolation (open)']
+              [Patch(facecolor='black', edgecolor='black'), Patch(facecolor='none', edgecolor='black')]
+    labels = [lab for _, lab, _ in RATER_GROUPS] + ['Image Refinement (Filled)', 'Spline Interpolation (Open)']
     fig.legend(handles, labels, loc='lower center', ncol=5, bbox_to_anchor=(0.5, -0.005), fontsize=9)
     fig.tight_layout(rect=(0, 0.035, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure4_aim2.png')); plt.close(fig)
 
