@@ -229,11 +229,59 @@ def figure_aim1(d):
     _box_grid(rows, 'figure2_aim1.png', 8.4)
 
 
-def figure_aim2(d):
-    """Aim 2 (simulated raters): rows = 1x, 2x and 4x raters, bones pooled; refinement includes keyframe refitting;
-    interpolation runs through the same (uncorrected) rater keyframes."""
+def figure_aim2_by_group(d):
+    """Aim 2, one row per rater group (bones pooled), in the aim 1 layout."""
     rows = [(f'{lv}x Raters', d[d.level == lv], METHOD[lv]) for lv in ('1', '2', '4')]
-    _box_grid(rows, 'figure4_aim2.png', 6.5)
+    _box_grid(rows, 'figure4_aim2_by_group.png', 6.5)
+
+
+RATER_GROUPS = [('1', '1x Raters', 2), ('2', '2x Raters', 3), ('4', '4x Raters', 4)]   # palette indices: green, magenta, purple
+
+
+def figure_aim2(d):
+    """Aim 2 (simulated raters), landscape: rows = tibia, talus, calcaneus, all bones; columns = helical translation
+    and rotation error. At each spacing, six boxes: image refinement for 1x, 2x, 4x raters (filled), then spline
+    interpolation for the same (open). Colour = rater group. Boxes as in aim 1 (median, IQR, whiskers 1.5 IQR,
+    outliers not drawn); shared y-axis down each column; dashed lines = Welte thresholds."""
+    from matplotlib.patches import Patch
+    from matplotlib.ticker import FixedLocator, FuncFormatter, NullFormatter
+    ps.apply()
+    fig, ax = plt.subplots(len(AIM1_ROWS), 2, figsize=(10.0, 7.0), sharex=True, sharey='col')
+    x = np.arange(len(SP)); w = 0.12; step = 0.135; gap = 0.06
+    offs = [(-2.5 + k) * step + (-gap / 2 if k < 3 else gap / 2) for k in range(6)]
+    for i, (b, bl) in enumerate(AIM1_ROWS):
+        eb = d if b is None else d[d.item == b]
+        for j, (col, title, th, lim, ticks) in enumerate(ERR_COLS):
+            a = ax[i, j]; k = 0
+            for meth in ('refine', 'interp'):
+                for lv, _, ci in RATER_GROUPS:
+                    arm = METHOD[lv] if meth == 'refine' else INTERP
+                    ea = eb[(eb.level == lv) & (eb.arm == arm)]; c = ps.color(ci)
+                    filled = meth == 'refine'
+                    a.boxplot([ea[ea.spacing == s_][col].values for s_ in SP], positions=x + offs[k], widths=w,
+                              showfliers=False, patch_artist=True,
+                              medianprops=dict(color='white' if filled else c, lw=1.3),
+                              whiskerprops=dict(color=c, lw=0.8), capprops=dict(color=c, lw=0.8),
+                              boxprops=dict(edgecolor=c, facecolor=c if filled else 'none', lw=1.0))
+                    k += 1
+            a.axhline(th, color='0.5', ls='--', lw=0.8, zorder=0)
+            a.set_yscale('log'); a.set_ylim(*lim)
+            a.yaxis.set_major_locator(FixedLocator(ticks)); a.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
+            a.yaxis.set_minor_formatter(NullFormatter())
+            for xs in x[:-1] + 0.5:
+                a.axvline(xs, color='0.9', lw=0.6, zorder=0)
+            if i == 0:
+                a.set_title(title, fontsize=10)
+            if j == 0:
+                a.set_ylabel(bl, fontsize=10)
+            if i == len(AIM1_ROWS) - 1:
+                a.set_xticks(x, SPL); a.set_xlabel('Keyframe Spacing', fontsize=9)
+            a.set_xlim(-0.55, len(SP) - 0.45)
+    handles = [Patch(facecolor=ps.color(ci), edgecolor=ps.color(ci)) for _, _, ci in RATER_GROUPS] + \
+              [Patch(facecolor='0.35', edgecolor='0.35'), Patch(facecolor='none', edgecolor='0.35')]
+    labels = [lab for _, lab, _ in RATER_GROUPS] + ['Image Refinement (filled)', 'Spline Interpolation (open)']
+    fig.legend(handles, labels, loc='lower center', ncol=5, bbox_to_anchor=(0.5, -0.005), fontsize=9)
+    fig.tight_layout(rect=(0, 0.035, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure4_aim2.png')); plt.close(fig)
 
 
 def boot_median_frames(v, rng, n=N_BOOT):
@@ -298,7 +346,7 @@ def checks(d, k):
 def main():
     d, k = load()
     t = summarise(d); t.to_csv(os.path.join(OUT, 'summary_long.csv'), index=False)
-    table1(t); figure2(t); figure_aim1(d); figure_aim2(d); table_aim1(d); refitting(k); figure3(k); checks(d, k)
+    table1(t); figure2(t); figure_aim1(d); figure_aim2(d); figure_aim2_by_group(d); table_aim1(d); refitting(k); figure3(k); checks(d, k)
     print('written to', OUT)
 
 
