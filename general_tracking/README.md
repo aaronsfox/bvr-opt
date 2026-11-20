@@ -51,6 +51,7 @@ BVR_DEVICE=cpu python general_tracking/run.py keys --cfg $C --tra $K --spacing 5
 bash general_tracking/slurm/submit.sh $C $K 10              # one spacing
 bash general_tracking/slurm/submit.sh $C $K 5:10:20:full    # several (colon-separated)
 #   options as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2  VIE=file.vie  TRA_PATTERN="*_Tracking.tra"
+#   PER_BONE=1  fit each bone alone over its own keyframes (see "Bones keyed on different frames")
 #   resubmitting the same command resumes; finished work is skipped
 
 # Or in one process (GPU node, or CPU for a short trial)
@@ -63,6 +64,16 @@ BVR_DEVICE=cpu python general_tracking/run.py run --cfg $C --tra $K --spacing fu
 Options: `--kc-tol mm:deg` sets how far keyframe correction may move a keyframe (default 1.5:2, the 95th
 percentile of a trained rater's error on Welte; `0:0` holds the keyframes exactly as given). `--bones` selects
 a subset of the volumes, `--vie` gives the renderer settings and `--out` sets the results folder.
+
+## Bones keyed on different frames
+
+By default the bones are fitted together (rendered jointly, with contact between them), so keyframes are taken
+only from frames keyed for every bone. If bones are keyed on different frames, `--per-bone` (`PER_BONE=1` for
+`submit.sh`) fits each bone alone between its own keyframes, with `--spacing all` filling every gap of every
+bone. The cost: bones are not rendered together, so a neighbour's edges where bones overlap in a view are not
+explained by the model, and contact between bones is not checked; review joints in Autoscoper. Results go to
+`s<spacing>_perbone/` (work files per bone in `work/<bone>/`), so a per-bone run never overwrites, or reuses
+the work of, a joint run's `s<spacing>/`. Keyframe correction runs for the bones in parallel.
 
 ## Outputs
 

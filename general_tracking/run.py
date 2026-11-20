@@ -16,6 +16,9 @@ outputs with other tracking in a separate step.
             every bone are always keyframes; a final gap shorter than N/2 joins the one before);
             full: the first and last tracked frames only; all: every tracked frame (sparse keyframes as given)
 --kc-tol    keyframe-correction tolerance mm:deg (default config.yaml, 1.5:2); 0:0 holds keyframes as given
+--per-bone  fit each bone alone, between its own keyframes, so bones need not share keyframe frames. Bones are
+            then not rendered together and contact is not checked. Results go to s<spacing>_perbone/, so they
+            never overwrite (or reuse) a joint run's s<spacing>/
 --bones, --vie, --out   bone subset; renderer settings if not in the trial folder; results folder
 
 `run` does the keyframe correction, every gap and `assemble` in turn. On the HPC the stages are split
@@ -31,6 +34,7 @@ Outputs in <out>/s<spacing>/ (default <out> = results/general_tracking/<trial>):
     work/                          intermediate results (keyframe correction, one file per gap)
 """
 import argparse
+import contextlib
 import fnmatch
 import glob
 import json
@@ -111,11 +115,36 @@ def setup(args):
         raise SystemExit(f'--kc-tol needs two values (mm and deg), got {args.kc_tol!r}')
     out = os.path.abspath(args.out or os.environ.get('BVR_RESULTS') or
                           os.path.join(ROOT, 'results', 'general_tracking', T.name))
-    S.update(T=T, bones=bones, tra=tra, given=given, order=order, tol=tol, out=out, cfg=cfg)
+    S.update(T=T, bones=bones, all_bones=list(bones), tra=tra, given=given, order=order, tol=tol, out=out, cfg=cfg,
+             per_bone=args.per_bone, tag=None)
     log('keyframe files: ' + ', '.join(f'{n} {os.path.basename(p)} ({order[n]}-major)' for n, p in tra.items()))
     log(f'renderer settings: {T.vie_path or "NOT FOUND (no xParameters/control_settings.vie next to the .cfg): "
                                             "using Welte defaults"} {T.vie["renderer"]}')
     return T
+
+
+@contextlib.contextmanager
+def active(bones, tag=None):
+    """Temporarily restrict the run to `bones` (per-bone mode: one bone, tag = its name for work paths)."""
+    old = S['bones'], S['tag']
+    S['bones'], S['tag'] = list(bones), tag
+    try:
+        yield
+    finally:
+        S['bones'], S['tag'] = old
+
+
+def bone_groups():
+    """[(bones, tag)]: all bones together, or (per-bone mode) each bone with at least two keyframes alone."""
+    if not S['per_bone']:
+        return [(S['bones'], None)]
+    out = []
+    for n in S['all_bones']:
+        if np.isfinite(S['given'][n]).all((1, 2)).sum() >= 2:
+            out.append(([n], n))
+        else:
+            log(f'per-bone: skipping {n} (fewer than two keyframes)')
+    return out
 
 
 def tracked_frames():
@@ -164,15 +193,21 @@ def kc_on():
 
 
 def sdir(spacing, *p):
-    return os.path.join(S['out'], f's{spacing}', *p)
+    """Results folder for a spacing: s<spacing>, or s<spacing>_perbone in per-bone mode (never shared)."""
+    return os.path.join(S['out'], f's{spacing}' + ('_perbone' if S['per_bone'] else ''), *p)
+
+
+def wdir(spacing, *p):
+    """Work folder; per-bone mode keeps each bone's work apart."""
+    return sdir(spacing, 'work', *((S['tag'],) if S['tag'] else ()), *p)
 
 
 def keys_path(spacing):
-    return sdir(spacing, 'work', 'keyframe_correction.json')
+    return wdir(spacing, 'keyframe_correction.json')
 
 
 def gap_path(spacing, a, b):
-    return sdir(spacing, 'work', 'gaps', f'{a}-{b}.json')
+    return wdir(spacing, 'gaps', f'{a}-{b}.json')
 
 
 def keyframe_poses(spacing):
@@ -180,8 +215,8 @@ def keyframe_poses(spacing):
     keys = keyframes(spacing)
     if not kc_on():
         return given_keys(keys)
-    if spacing in MEMO:
-        return MEMO[spacing]
+    if (spacing, S['tag']) in MEMO:
+        return MEMO[(spacing, S['tag'])]
     p = keys_path(spacing)
     if not os.path.exists(p):
         raise SystemExit(f'corrected keyframes missing ({p}): run --stage keys first')
@@ -271,30 +306,65 @@ def stage_keys(spacing, quick):
     p = keys_path(spacing)
     if os.path.exists(p) and not quick:
         return
-    log(f'start keyframe correction, spacing {spacing}: {len(keyframes(spacing))} keyframes, tol {S["tol"]}')
+    log(f'start keyframe correction, spacing {spacing}, {"+".join(S["bones"])}: {len(keyframes(spacing))} keyframes, tol {S["tol"]}')
     kp, meta = correct_keyframes(spacing)
     if quick:
-        MEMO[spacing] = kp; log('smoke test: keyframe correction done'); return
+        MEMO[(spacing, S['tag'])] = kp; log('smoke test: keyframe correction done'); return
     save(p, dict(keyframes={n: {str(k): M.tolist() for k, M in d.items()} for n, d in kp.items()}, **meta))
     log(f'done keyframe correction, spacing {spacing}: {meta["sec"]:.0f}s')
 
 
+def gap_units(spacing):
+    units = []
+    for bones, tag in bone_groups():
+        with active(bones, tag):
+            units += [(bones, tag, a, b) for a, b in gaps(spacing)]
+    return units
+
+
 def stage_gaps(spacing, task, ntasks, quick):
-    todo = gaps(spacing)[task::ntasks]
+    todo = gap_units(spacing)[task::ntasks]
     log(f'spacing {spacing}: {len(todo)} gaps for task {task}/{ntasks}')
-    for a, b in todo:
-        p = gap_path(spacing, a, b)
-        if os.path.exists(p) and not quick:
-            continue
-        log(f'start gap {a}-{b}, spacing {spacing}')
-        d = fit_gap(spacing, a, b)
-        if quick:
-            log(f'smoke test: gap {a}-{b} done, {d["sec"]:.0f}s'); continue
-        save(p, d); log(f'done gap {a}-{b}, spacing {spacing}: {d["sec"]:.0f}s')
+    for bones, tag, a, b in todo:
+        with active(bones, tag):
+            p = gap_path(spacing, a, b); who = '+'.join(bones)
+            if os.path.exists(p) and not quick:
+                continue
+            log(f'start gap {a}-{b}, spacing {spacing}, {who}')
+            d = fit_gap(spacing, a, b)
+            if quick:
+                log(f'smoke test: gap {a}-{b} ({who}) done, {d["sec"]:.0f}s'); continue
+            save(p, d); log(f'done gap {a}-{b}, spacing {spacing}, {who}: {d["sec"]:.0f}s')
 
 
 def assemble(spacing):
-    """Write the optimised and spline .tra files, keyframes.json and diagnostics.csv for one spacing."""
+    """Write the optimised and spline .tra files, keyframes.json and diagnostics.csv for one spacing (per-bone
+    mode: every bone's files in the same s<spacing>_perbone folder)."""
+    parts = []
+    for bones, tag in bone_groups():
+        with active(bones, tag):
+            parts.append(assemble_part(spacing))
+    diag = sorted(r for p in parts for r in p['diag'])
+    with open(sdir(spacing, 'diagnostics.csv'), 'w') as fh:
+        fh.write('frame,bone,gap_start,gap_end,chain_disagreement_mm,chain_disagreement_deg\n')
+        for r in diag:
+            fh.write(f'{r[0]},{r[1]},{r[2]},{r[3]},{r[4]:.4f},{r[5]:.4f}\n')
+    head = dict(trial=S['T'].name, cfg=S['cfg'], tra=S['tra'], tra_order=S['order'], spacing=spacing,
+                per_bone=S['per_bone'], keyframe_correction_tol=S['tol'] if kc_on() else None)
+    if S['per_bone']:
+        info = dict(head, bones={p['bones'][0]: {k: p[k] for k in ('keyframes', 'correction_moved', 'gaps_done',
+                                                                    'gaps_total')} for p in parts})
+    else:
+        p = parts[0]; info = dict(head, bones=p['bones'], **{k: p[k] for k in ('keyframes', 'correction_moved',
+                                                                                'gaps_done', 'gaps_total')})
+    json.dump(info, open(sdir(spacing, 'keyframes.json'), 'w'), indent=1)
+    done, total = sum(p['gaps_done'] for p in parts), sum(p['gaps_total'] for p in parts)
+    status = 'complete' if done == total else f'INCOMPLETE: {total - done} gaps missing (NaN in optimised/)'
+    log(f'spacing {spacing}: {done}/{total} gaps, {status}; written to {sdir(spacing)}')
+
+
+def assemble_part(spacing):
+    """Write the .tra files of the active bones; return their keyframes, diagnostics and gap counts."""
     T = S['T']; BONES = S['bones']; keys = keyframes(spacing); gs = gaps(spacing)
     given = given_keys(keys)
     spline = spline_track(T, given, CFG['spline'])
@@ -318,24 +388,26 @@ def assemble(spacing):
     os.makedirs(sdir(spacing, 'optimised'), exist_ok=True)
     for n in BONES:
         write_tra(sdir(spacing, 'optimised', f'{T.name}_{n}.tra'), opt[n], S['order'][n])
-    with open(sdir(spacing, 'diagnostics.csv'), 'w') as fh:
-        fh.write('frame,bone,gap_start,gap_end,chain_disagreement_mm,chain_disagreement_deg\n')
-        for r in sorted(diag):
-            fh.write(f'{r[0]},{r[1]},{r[2]},{r[3]},{r[4]:.4f},{r[5]:.4f}\n')
     moved = {n: {str(k): dict(pivot_mm=pivot_error(K[n][k], given[n][k], T.bones[n].pivot),
                               rot_deg=helical_error(K[n][k], given[n][k])[0]) for k in keys} for n in BONES}
-    json.dump(dict(trial=T.name, cfg=S['cfg'], tra=S['tra'], tra_order=S['order'], bones=S['bones'], spacing=spacing, keyframes=keys,
-                   keyframe_correction_tol=S['tol'] if kc_on() else None, correction_moved=moved,
-                   gaps_done=done, gaps_total=len(gs)),
-              open(sdir(spacing, 'keyframes.json'), 'w'), indent=1)
-    status = 'complete' if done == len(gs) else f'INCOMPLETE: {len(gs) - done} gaps missing (NaN in optimised/)'
-    log(f'spacing {spacing}: {done}/{len(gs)} gaps, {status}; written to {sdir(spacing)}')
+    return dict(bones=list(BONES), keyframes=keys, correction_moved=moved, gaps_done=done, gaps_total=len(gs),
+                diag=diag)
 
 
 def cmd_keys(spacings):
+    if S['per_bone']:
+        print(f'per-bone mode: each bone uses its own keyframes; results in s<spacing>_perbone/')
+        for bones, tag in bone_groups():
+            with active(bones, tag):
+                print(f'== {tag}'); _keys_report(spacings)
+    else:
+        _keys_report(spacings)
+
+
+def _keys_report(spacings):
     T = S['T']; tr, partial = tracked_frames()
     print(f'{T.name}: {T.n_frames} frames; bones {S["bones"]}; keyframe tracking from '
-          + ', '.join(os.path.basename(p) for p in S['tra'].values()))
+          + ', '.join(os.path.basename(S['tra'][n]) for n in S['bones']))
     print(f'  tracked for every bone: {len(tr)} frames ({tr[0]}-{tr[-1]})' if tr else '  no frame tracked for every bone')
     if partial:
         print(f'  ignored: {len(partial)} frames tracked for some bones only')
@@ -360,6 +432,9 @@ def main():
     ap.add_argument('--bones', default=None, help='subset of the .cfg volumes, comma- or colon-separated')
     ap.add_argument('--vie', default=None, help='Autoscoper renderer settings, if not found in the trial folder')
     ap.add_argument('--out', default=None, help='results folder (default results/general_tracking/<trial>)')
+    ap.add_argument('--per-bone', action='store_true',
+                    help='fit each bone alone over its own keyframes (no shared frames needed; no joint rendering or '
+                         'contact); results in s<spacing>_perbone/')
     ap.add_argument('--quick', action='store_true', help='smoke test: 2 iterations per stage; nothing saved')
     args = ap.parse_args()
     torch.set_num_threads(int(os.environ.get('THREADS', os.environ.get('SLURM_CPUS_PER_TASK', '2'))))
@@ -369,14 +444,17 @@ def main():
     if args.cmd == 'keys':
         cmd_keys(spacings)
     elif args.cmd == 'ngaps':
-        print(sum(len(gaps(s)) for s in spacings))
+        print(sum(len(gap_units(s)) for s in spacings))
     elif args.cmd == 'assemble':
         for s in spacings: assemble(s)
     else:
         log(f'device {DEVICE}, trial {S["T"].name}, bones {S["bones"]}, spacing {args.spacing}, stage {args.stage}')
         for s in spacings:
-            if args.stage in ('all', 'keys') and args.task == 0:
-                stage_keys(s, args.quick)
+            if args.stage in ('all', 'keys'):
+                for bones, tag in bone_groups()[args.task::args.ntasks] if args.stage == 'keys' else \
+                        (bone_groups() if args.task == 0 else []):
+                    with active(bones, tag):
+                        stage_keys(s, args.quick)
             if args.stage in ('all', 'gaps'):
                 stage_gaps(s, args.task, args.ntasks, args.quick)
             if args.stage == 'all' and args.ntasks == 1 and not args.quick:
