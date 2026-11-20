@@ -15,7 +15,7 @@ separate step on the `.tra` files.
 ```
 <trial folder>/
     <name>.cfg              Autoscoper Version 1.1; paths relative to this folder (Windows separators fine)
-    <calibrations>          MayaCam 2.0, one per camera
+    <calibrations>          MayaCam 2.0 or 1.0 (detected as Autoscoper does), one per camera
     <CameraRootDir>/*.tif   one image per frame per camera, sorted by file name; 8- or 16-bit
     <VolumeFile>.tif        one segmented CT volume per bone; the bone is named after the file
                             (Femur.tif -> Femur); VolumeFlip is applied

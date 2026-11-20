@@ -1,7 +1,7 @@
 """Loading an Autoscoper trial folder.
 
 Welte layout (see utilities/organise_welte2022.py):
-    <trial>/<trial>.cfg, Calibration/*.txt (MayaCam 2.0), Models/PV/*.tif, RadiographImages/cam1|cam2,
+    <trial>/<trial>.cfg, Calibration/*.txt (MayaCam 2.0; MayaCam 1.0 also read), Models/PV/*.tif, RadiographImages/cam1|cam2,
     Reference/<trial>_{cal,tal,tib}.tra, xParameters/control_settings.vie
 Any other Autoscoper Version 1.1 .cfg also loads with Trial(folder, cfg=path): paths may use Windows
 separators, 8- or 16-bit radiographs are scaled to [0, 1] by their dtype, VolumeFlip is applied, and the
@@ -17,7 +17,7 @@ import tifffile
 import torch
 import torch.nn.functional as F
 
-from .cameras import MayaCam2
+from .cameras import load_camera
 from .drr import Bone
 from .device import dev
 from .filters import parse_vie
@@ -87,13 +87,18 @@ class Trial:
             elif key == 'VolumeFlip': flips.append(tuple(int(float(x)) for x in val.split()))
             elif key == 'RenderResolution': self.render_resolution = tuple(int(x) for x in val.split())
         if len(flips) < len(vols): flips += [(0, 0, 0)] * (len(vols) - len(flips))
-        self.cams = [MayaCam2(os.path.join(folder, c)) for c in cams]
+        self.cams = [load_camera(os.path.join(folder, c)) for c in cams]   # MayaCam 2.0 or 1.0
         self.image_files = [sorted(f for e in ('*.tif', '*.tiff', '*.TIF', '*.TIFF')
                                    for f in glob.glob(os.path.join(folder, r, e))) for r in roots]
         if not all(self.image_files) or len({len(f) for f in self.image_files}) != 1:
             raise ValueError(f'{self.name}: expected the same number (> 0) of .tif images per camera, found '
                              f'{[len(f) for f in self.image_files]} in {roots}')
         self.n_frames = len(self.image_files[0])
+        for i, cam in enumerate(self.cams):
+            h, w = tifffile.TiffFile(self.image_files[i][0]).pages[0].shape[:2]
+            if (h, w) != (cam.H, cam.W):
+                raise ValueError(f'{self.name}: camera {i + 1} images are {w} x {h} px but its {cam.format} calibration '
+                                 f'says {cam.W} x {cam.H} (MayaCam 1.0 assumes 1024 x 1024 when line 5 gives 0)')
         self.vie_path = vie or self._find_vie(folder)
         if self.vie_path:
             self.vie = parse_vie(self.vie_path)
