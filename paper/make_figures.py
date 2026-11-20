@@ -183,28 +183,31 @@ AIM1_ARMS = [('Image Refinement', METHOD['ideal'], 0), ('Spline Interpolation', 
 AIM1_ROWS = [('tib', 'Tibia'), ('tal', 'Talus'), ('cal', 'Calcaneus'), (None, 'All Bones')]
 
 
-def figure_aim1(d):
-    """Aim 1 (reference keyframes): rows = tibia, talus, calcaneus, all bones; columns = helical translation and
-    rotation error. Boxplots over every scored frame (median, IQR, whiskers to 1.5 IQR, outliers not drawn);
-    x = keyframe spacing; colour = image refinement vs spline interpolation. Shared y-axis down each column."""
-    ps.apply()
-    e0 = d[d.level == 'ideal']
-    cols = [('hel_mm', 'Helical Translation Error (mm)', TH_TR, (0.001, 50), [0.001, 0.01, 0.1, 1, 10, 50]),
+ERR_COLS = [('hel_mm', 'Helical Translation Error (mm)', TH_TR, (0.001, 50), [0.001, 0.01, 0.1, 1, 10, 50]),
             ('rot_deg', 'Helical Rotation Error (°)', TH_ROT, (0.01, 30), [0.01, 0.1, 1, 10, 30])]
-    fig, ax = plt.subplots(len(AIM1_ROWS), 2, figsize=(ps.DOUBLE, 8.4), sharex=True, sharey='col')
+
+
+def _box_grid(rows, fname, height):
+    """Shared layout for the error figures. rows = [(row label, frames for the row, image-refinement arm)];
+    columns = helical translation and rotation error; boxplots over every scored frame (median, IQR, whiskers to
+    1.5 IQR, outliers not drawn); x = keyframe spacing; colour = image refinement vs spline interpolation;
+    shared y-axis down each column; dashed lines = Welte thresholds."""
+    from matplotlib.lines import Line2D
+    from matplotlib.ticker import FixedLocator, FuncFormatter, NullFormatter
+    ps.apply()
+    fig, ax = plt.subplots(len(rows), 2, figsize=(ps.DOUBLE, height), sharex=True, sharey='col')
     x = np.arange(len(SP)); w = 0.36
-    for i, (b, bl) in enumerate(AIM1_ROWS):
-        eb = e0 if b is None else e0[e0.item == b]
-        for j, (col, title, th, lim, ticks) in enumerate(cols):
+    for i, (bl, eb, ref_arm) in enumerate(rows):
+        arms = [('Image Refinement', ref_arm, 0), ('Spline Interpolation', INTERP, 1)]
+        for j, (col, title, th, lim, ticks) in enumerate(ERR_COLS):
             a = ax[i, j]
-            for k, (lab, arm, ci) in enumerate(AIM1_ARMS):
+            for k, (lab, arm, ci) in enumerate(arms):
                 ea = eb[eb.arm == arm]; c = ps.color(ci)
-                bp = a.boxplot([ea[ea.spacing == s_][col].values for s_ in SP], positions=x + (k - 0.5) * (w + 0.06),
-                               widths=w, showfliers=False, patch_artist=True,
-                               medianprops=dict(color=c, lw=1.6), whiskerprops=dict(color=c, lw=1.0),
-                               capprops=dict(color=c, lw=1.0), boxprops=dict(edgecolor=c, facecolor='none', lw=1.2))
+                a.boxplot([ea[ea.spacing == s_][col].values for s_ in SP], positions=x + (k - 0.5) * (w + 0.06),
+                          widths=w, showfliers=False, patch_artist=True,
+                          medianprops=dict(color=c, lw=1.6), whiskerprops=dict(color=c, lw=1.0),
+                          capprops=dict(color=c, lw=1.0), boxprops=dict(edgecolor=c, facecolor='none', lw=1.2))
             a.axhline(th, color='0.5', ls='--', lw=0.8, zorder=0)
-            from matplotlib.ticker import FixedLocator, FuncFormatter, NullFormatter
             a.set_yscale('log'); a.set_ylim(*lim)
             a.yaxis.set_major_locator(FixedLocator(ticks)); a.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
             a.yaxis.set_minor_formatter(NullFormatter())
@@ -212,12 +215,25 @@ def figure_aim1(d):
                 a.set_title(title, fontsize=10)
             if j == 0:
                 a.set_ylabel(bl, fontsize=10)
-            if i == len(AIM1_ROWS) - 1:
+            if i == len(rows) - 1:
                 a.set_xticks(x, SPL); a.set_xlabel('Keyframe Spacing', fontsize=9)
-    from matplotlib.lines import Line2D
-    fig.legend([Line2D([], [], color=ps.color(c), lw=1.6) for _, _, c in AIM1_ARMS], [l for l, _, _ in AIM1_ARMS],
+    fig.legend([Line2D([], [], color=ps.color(c), lw=1.6) for c in (0, 1)], ['Image Refinement', 'Spline Interpolation'],
                loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.005), fontsize=9)
-    fig.tight_layout(rect=(0, 0.03, 1, 1)); ps.save(fig, os.path.join(OUT, 'figure2_aim1.png')); plt.close(fig)
+    fig.tight_layout(rect=(0, 0.03 * 4 / len(rows), 1, 1)); ps.save(fig, os.path.join(OUT, fname)); plt.close(fig)
+
+
+def figure_aim1(d):
+    """Aim 1 (reference keyframes): rows = tibia, talus, calcaneus, all bones."""
+    e0 = d[d.level == 'ideal']
+    rows = [(bl, e0 if b is None else e0[e0.item == b], METHOD['ideal']) for b, bl in AIM1_ROWS]
+    _box_grid(rows, 'figure2_aim1.png', 8.4)
+
+
+def figure_aim2(d):
+    """Aim 2 (simulated raters): rows = 1x, 2x and 4x raters, bones pooled; refinement includes keyframe refitting;
+    interpolation runs through the same (uncorrected) rater keyframes."""
+    rows = [(f'{lv}x Raters', d[d.level == lv], METHOD[lv]) for lv in ('1', '2', '4')]
+    _box_grid(rows, 'figure4_aim2.png', 6.5)
 
 
 def boot_median_frames(v, rng, n=N_BOOT):
@@ -282,7 +298,7 @@ def checks(d, k):
 def main():
     d, k = load()
     t = summarise(d); t.to_csv(os.path.join(OUT, 'summary_long.csv'), index=False)
-    table1(t); figure2(t); figure_aim1(d); table_aim1(d); refitting(k); figure3(k); checks(d, k)
+    table1(t); figure2(t); figure_aim1(d); figure_aim2(d); table_aim1(d); refitting(k); figure3(k); checks(d, k)
     print('written to', OUT)
 
 
