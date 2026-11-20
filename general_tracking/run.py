@@ -9,7 +9,8 @@ outputs with other tracking in a separate step.
     python general_tracking/run.py assemble --cfg TRIAL.cfg --tra DIR --spacing 10        # write the .tra files
 
 --tra       a folder with one .tra per bone, named after the bone's volume (Femur_keys.tra -> Femur.tif),
-            or explicit pairs: --tra Femur=a.tra,Tibia=b.tra
+            or explicit pairs: --tra Femur=a.tra,Tibia=b.tra. Row- or column-major matrices are detected per
+            file, and the outputs for each bone are written in the same order as its input
 --spacing   N: a keyframe every N frames from the first tracked frame (the first and last frames tracked for
             every bone are always keyframes; a final gap shorter than N/2 joins the one before);
             full: the first and last tracked frames only; all: every tracked frame (sparse keyframes as given)
@@ -46,7 +47,7 @@ import torch  # noqa: E402
 
 from src.device import DEVICE  # noqa: E402
 from src.geometry import helical_error, pivot_error  # noqa: E402
-from src.io import Trial, read_tra, write_tra  # noqa: E402
+from src.io import Trial, read_tra, tra_order, write_tra  # noqa: E402
 from src.pipeline import anchored_setup, f2f_for, spline_track  # noqa: E402
 from src.tracking import AnchoredFit, KeyframeFit, blend_poses, chain  # noqa: E402
 
@@ -93,9 +94,10 @@ def setup(args):
     if unknown:
         raise SystemExit(f'--bones {unknown} not among the volumes in {cfg}: {list(T.bones)}')
     tra = find_tra(args.tra, bones)
-    given = {}
+    given, order = {}, {}
     for n, p in tra.items():
-        M = read_tra(p)
+        order[n] = tra_order(p)                   # row- or column-major; outputs are written the same way
+        M = read_tra(p, order[n])
         if len(M) != T.n_frames:
             raise SystemExit(f'{p}: {len(M)} frames, but the trial has {T.n_frames} radiographs per camera')
         given[n] = M
@@ -104,7 +106,8 @@ def setup(args):
         raise SystemExit(f'--kc-tol needs two values (mm and deg), got {args.kc_tol!r}')
     out = os.path.abspath(args.out or os.environ.get('BVR_RESULTS') or
                           os.path.join(ROOT, 'results', 'general_tracking', T.name))
-    S.update(T=T, bones=bones, tra=tra, given=given, tol=tol, out=out, cfg=cfg)
+    S.update(T=T, bones=bones, tra=tra, given=given, order=order, tol=tol, out=out, cfg=cfg)
+    log('keyframe files: ' + ', '.join(f'{n} {os.path.basename(p)} ({order[n]}-major)' for n, p in tra.items()))
     log(f'renderer settings: {T.vie_path or "NOT FOUND (no xParameters/control_settings.vie next to the .cfg): "
                                             "using Welte defaults"} {T.vie["renderer"]}')
     return T
@@ -292,7 +295,7 @@ def assemble(spacing):
     spline = spline_track(T, given, CFG['spline'])
     os.makedirs(sdir(spacing, 'spline'), exist_ok=True)
     for n in BONES:
-        write_tra(sdir(spacing, 'spline', f'{T.name}_{n}.tra'), spline[n])
+        write_tra(sdir(spacing, 'spline', f'{T.name}_{n}.tra'), spline[n], S['order'][n])
     K = keyframe_poses(spacing)
     opt = {n: np.full((T.n_frames, 4, 4), np.nan) for n in BONES}
     for n in BONES:
@@ -309,14 +312,14 @@ def assemble(spacing):
                 diag.append((int(f), n, a, b, mm, deg))
     os.makedirs(sdir(spacing, 'optimised'), exist_ok=True)
     for n in BONES:
-        write_tra(sdir(spacing, 'optimised', f'{T.name}_{n}.tra'), opt[n])
+        write_tra(sdir(spacing, 'optimised', f'{T.name}_{n}.tra'), opt[n], S['order'][n])
     with open(sdir(spacing, 'diagnostics.csv'), 'w') as fh:
         fh.write('frame,bone,gap_start,gap_end,chain_disagreement_mm,chain_disagreement_deg\n')
         for r in sorted(diag):
             fh.write(f'{r[0]},{r[1]},{r[2]},{r[3]},{r[4]:.4f},{r[5]:.4f}\n')
     moved = {n: {str(k): dict(pivot_mm=pivot_error(K[n][k], given[n][k], T.bones[n].pivot),
                               rot_deg=helical_error(K[n][k], given[n][k])[0]) for k in keys} for n in BONES}
-    json.dump(dict(trial=T.name, cfg=S['cfg'], tra=S['tra'], bones=S['bones'], spacing=spacing, keyframes=keys,
+    json.dump(dict(trial=T.name, cfg=S['cfg'], tra=S['tra'], tra_order=S['order'], bones=S['bones'], spacing=spacing, keyframes=keys,
                    keyframe_correction_tol=S['tol'] if kc_on() else None, correction_moved=moved,
                    gaps_done=done, gaps_total=len(gs)),
               open(sdir(spacing, 'keyframes.json'), 'w'), indent=1)

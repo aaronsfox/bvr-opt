@@ -25,9 +25,32 @@ from .filters import parse_vie
 
 def read_tra(path, order='column'):
     """Autoscoper .tra: one 4x4 per line (16 comma-separated values; NaN rows = untracked).
-    Welte reference files are column-major (translation in elements 13-15)."""
+    Welte reference files are column-major (translation in elements 13-15). order: 'column', 'row', or 'auto'
+    (detected by tra_order)."""
+    if order == 'auto':
+        order = tra_order(path)
     A = np.genfromtxt(path, delimiter=',').reshape(-1, 4, 4)
     return A.transpose(0, 2, 1) if order == 'column' else A
+
+
+def tra_order(path, tol=1e-6):
+    """Detect whether an Autoscoper .tra stores each 4x4 column-major ('column': translation in elements 13-15,
+    as Welte's files and Autoscoper's default export) or row-major ('row': translation in elements 4, 8, 12).
+    Decided from the tracked lines: the bottom row (0, 0, 0, 1) sits in elements 4, 8, 12, 16 when column-major
+    and in elements 13-16 when row-major. Lines with zero translation fit both and are skipped; if every line
+    is like that, 'column' is returned."""
+    A = np.genfromtxt(path, delimiter=',').reshape(-1, 16)
+    A = A[np.isfinite(A).all(1)]
+    if not len(A):
+        raise ValueError(f'{path}: no tracked frames')
+    col = (np.abs(A[:, [3, 7, 11]]).max(1) < tol) & (np.abs(A[:, 15] - 1) < tol)
+    row = (np.abs(A[:, [12, 13, 14]]).max(1) < tol) & (np.abs(A[:, 15] - 1) < tol)
+    if (~(col | row)).any():
+        raise ValueError(f'{path}: {int((~(col | row)).sum())} tracked lines are not rigid 4x4 poses in either '
+                         'row- or column-major order (expected a bottom row of 0, 0, 0, 1)')
+    if (col & ~row).any() and (row & ~col).any():
+        raise ValueError(f'{path}: mixes row-major and column-major lines')
+    return 'row' if (row & ~col).any() else 'column'
 
 
 def write_tra(path, Ms, order='column'):

@@ -22,7 +22,8 @@ separate step on the `.tra` files.
     xParameters/control_settings.vie   renderer settings, as Autoscoper looks for them (Welte defaults if
                                        absent; each job log names the file used)
 <keyframe folder>/*.tra     one per bone, named after it (Femur_keys.tra), as Autoscoper writes them:
-                            one line per frame, NaN on frames without a keyframe
+                            one line per frame, NaN on frames without a keyframe; row- or column-major
+                            (detected per file; each bone's outputs are written in the same order)
 ```
 
 **Keyframes** are taken only from frames tracked for every bone. The spacing sets which of them are used:
