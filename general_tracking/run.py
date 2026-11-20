@@ -9,7 +9,8 @@ outputs with other tracking in a separate step.
     python general_tracking/run.py assemble --cfg TRIAL.cfg --tra DIR --spacing 10        # write the .tra files
 
 --tra       a folder with one .tra per bone, named after the bone's volume (Femur_keys.tra -> Femur.tif),
-            or explicit pairs: --tra Femur=a.tra,Tibia=b.tra. Row- or column-major matrices are detected per
+            or explicit pairs: --tra Femur=a.tra,Tibia=b.tra. --tra-pattern "*_Tracking.tra" uses only the
+            matching files in the folder (case-insensitive), to skip others such as *_Initial.tra. Row- or column-major matrices are detected per
             file, and the outputs for each bone are written in the same order as its input
 --spacing   N: a keyframe every N frames from the first tracked frame (the first and last frames tracked for
             every bone are always keyframes; a final gap shorter than N/2 joins the one before);
@@ -30,6 +31,7 @@ Outputs in <out>/s<spacing>/ (default <out> = results/general_tracking/<trial>):
     work/                          intermediate results (keyframe correction, one file per gap)
 """
 import argparse
+import fnmatch
 import glob
 import json
 import math
@@ -63,17 +65,20 @@ def log(*a):
 
 
 # ------------------------------------------------------------------------------------------- inputs
-def find_tra(spec, bones):
-    """{bone: .tra path} from a folder (one file per bone, matched by name) or 'Bone=path,Bone=path'."""
+def find_tra(spec, bones, pattern='*.tra'):
+    """{bone: .tra path} from a folder (one file per bone, matched by name) or 'Bone=path,Bone=path'.
+    pattern: only files in the folder whose names match it (case-insensitive), e.g. '*_tracking.tra'."""
     if os.path.isdir(spec):
-        files = sorted(glob.glob(os.path.join(spec, '*.tra')))
+        files = sorted(f for f in glob.glob(os.path.join(spec, '*'))
+                       if fnmatch.fnmatch(os.path.basename(f).lower(), pattern.lower()))
         out = {}
         for n in bones:
             hit = [f for f in files if os.path.basename(f).lower().startswith(n.lower())] or \
                   [f for f in files if n.lower() in os.path.basename(f).lower()]
             if len(hit) != 1:
-                raise SystemExit(f'bone {n}: expected one .tra in {spec} named after it, found {len(hit)} '
-                                 f'({[os.path.basename(f) for f in hit]}); pass --tra {n}=path explicitly')
+                raise SystemExit(f'bone {n}: expected one file matching {pattern!r} in {spec} named after it, found '
+                                 f'{len(hit)} ({[os.path.basename(f) for f in hit]}); narrow it with --tra-pattern '
+                                 f'(e.g. "*_Tracking.tra") or pass --tra {n}=path explicitly')
             out[n] = hit[0]
         return out
     out = dict(p.split('=', 1) for p in spec.split(','))
@@ -93,7 +98,7 @@ def setup(args):
     unknown = [n for n in bones if n not in T.bones]
     if unknown:
         raise SystemExit(f'--bones {unknown} not among the volumes in {cfg}: {list(T.bones)}')
-    tra = find_tra(args.tra, bones)
+    tra = find_tra(args.tra, bones, args.tra_pattern)
     given, order = {}, {}
     for n, p in tra.items():
         order[n] = tra_order(p)                   # row- or column-major; outputs are written the same way
@@ -345,6 +350,8 @@ def main():
     ap.add_argument('cmd', choices=['keys', 'run', 'assemble', 'ngaps'])
     ap.add_argument('--cfg', help='Autoscoper .cfg of the trial (paths in it are relative to its folder)')
     ap.add_argument('--tra', help='folder with one keyframe .tra per bone, or Bone=path,Bone=path')
+    ap.add_argument('--tra-pattern', default='*.tra',
+                    help='only .tra files in the --tra folder matching this (case-insensitive), e.g. "*_Tracking.tra"')
     ap.add_argument('--spacing', required=True, help='N, full or all; several comma-separated')
     ap.add_argument('--stage', default='all', choices=['all', 'keys', 'gaps'])
     ap.add_argument('--task', type=int, default=0)

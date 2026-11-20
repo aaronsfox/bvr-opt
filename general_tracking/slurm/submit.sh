@@ -6,13 +6,14 @@
 #        datasets/UNC/Test_Tracking 10
 #      SPACING: N, full or all; several as N:N:... (e.g. 5:10:20:full). CFG and TRA must not contain commas.
 # Optional, as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2 (0:0 = no keyframe correction)  VIE=file.vie
+#   TRA_PATTERN="*_Tracking.tra" (use only matching .tra files in TRA, e.g. to skip *_Initial.tra)
 # Finished work is skipped, so resubmitting the same command resumes.
 set -euo pipefail
 CFG=$1; TRA=$2; WORKERS=${4:-4}; TIME=${5:-12:00:00}
 cd "$(dirname "$0")/../.."
 LOGS=results/general_tracking/$(basename "$CFG" .cfg)/logs; mkdir -p "$LOGS"
 GPU=(--partition=dgx --gres=gpu:1 --cpus-per-task=16 --mem=64G)
-EXP="ALL,CFG=$CFG,TRA=$TRA,SPACING=${3},BONES=${BONES:-},KC_TOL=${KC_TOL:-},VIE=${VIE:-}"
+EXP="ALL,CFG=$CFG,TRA=$TRA,SPACING=${3},BONES=${BONES:-},KC_TOL=${KC_TOL:-},VIE=${VIE:-},TRA_PATTERN=${TRA_PATTERN:-}"
 SP=${3//:/-}   # spacings as they appear in job and log names: no colons (Windows cannot open them)
 TAG=$(basename "$CFG" .cfg)-s$SP
 DEP=()

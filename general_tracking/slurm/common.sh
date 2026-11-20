@@ -14,3 +14,4 @@ ARGS=(--cfg "$CFG" --tra "$TRA" --spacing "${SPACING//:/,}")
 if [ -n "${BONES:-}" ]; then ARGS+=(--bones "$BONES"); fi
 if [ -n "${KC_TOL:-}" ]; then ARGS+=(--kc-tol "$KC_TOL"); fi
 if [ -n "${VIE:-}" ]; then ARGS+=(--vie "$VIE"); fi
+if [ -n "${TRA_PATTERN:-}" ]; then ARGS+=(--tra-pattern "$TRA_PATTERN"); fi

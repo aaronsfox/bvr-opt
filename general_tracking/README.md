@@ -23,7 +23,9 @@ separate step on the `.tra` files.
                                        absent; each job log names the file used)
 <keyframe folder>/*.tra     one per bone, named after it (Femur_keys.tra), as Autoscoper writes them:
                             one line per frame, NaN on frames without a keyframe; row- or column-major
-                            (detected per file; each bone's outputs are written in the same order)
+                            (detected per file; each bone's outputs are written in the same order). If the
+                            folder holds other .tra files for the same bones (e.g. *_Initial.tra), choose
+                            the ones to use with --tra-pattern "*_Tracking.tra" (TRA_PATTERN for submit.sh)
 ```
 
 **Keyframes** are taken only from frames tracked for every bone. The spacing sets which of them are used:
@@ -48,7 +50,7 @@ BVR_DEVICE=cpu python general_tracking/run.py keys --cfg $C --tra $K --spacing 5
 # HPC: keyframe correction -> gaps (4 workers on one GPU) -> .tra files written (CPU)
 bash general_tracking/slurm/submit.sh $C $K 10              # one spacing
 bash general_tracking/slurm/submit.sh $C $K 5:10:20:full    # several (colon-separated)
-#   options as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2  VIE=file.vie
+#   options as environment variables: BONES=Femur:Tibia  KC_TOL=1.5:2  VIE=file.vie  TRA_PATTERN="*_Tracking.tra"
 #   resubmitting the same command resumes; finished work is skipped
 
 # Or in one process (GPU node, or CPU for a short trial)
